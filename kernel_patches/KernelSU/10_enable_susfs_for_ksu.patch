@@ -197,7 +197,7 @@ index b5b7d3a8..fa2e38a9 100644
  }
 \ No newline at end of file
 diff --git a/kernel/app_profile.c b/kernel/app_profile.c
-index b7ec4744..3c211728 100644
+index 8bb9b6f1..83c4ef5c 100644
 --- a/kernel/app_profile.c
 +++ b/kernel/app_profile.c
 @@ -12,7 +12,9 @@
@@ -210,7 +210,7 @@ index b7ec4744..3c211728 100644
  
  #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 7, 0)
  static struct group_info root_groups = { .usage = REFCOUNT_INIT(2) };
-@@ -81,8 +83,10 @@ static void disable_seccomp(void)
+@@ -95,8 +97,10 @@ static void disable_seccomp(void)
  void escape_with_root_profile(void)
  {
      struct cred *cred;
@@ -221,8 +221,8 @@ index b7ec4744..3c211728 100644
  
      cred = prepare_creds();
      if (!cred) {
-@@ -133,9 +137,11 @@ void escape_with_root_profile(void)
-     spin_unlock_irq(&current->sighand->siglock);
+@@ -143,9 +147,11 @@ void escape_with_root_profile(void)
+     disable_seccomp();
  
      setup_selinux(profile->selinux_domain);
 +#ifndef CONFIG_KSU_SUSFS
