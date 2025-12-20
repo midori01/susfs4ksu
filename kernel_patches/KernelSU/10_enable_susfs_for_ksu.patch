@@ -197,10 +197,10 @@ index b5b7d3a8..fa2e38a9 100644
  }
 \ No newline at end of file
 diff --git a/kernel/app_profile.c b/kernel/app_profile.c
-index 8bb9b6f1..83c4ef5c 100644
+index 7bfedeac..a24006ea 100644
 --- a/kernel/app_profile.c
 +++ b/kernel/app_profile.c
-@@ -12,7 +12,9 @@
+@@ -13,7 +13,9 @@
  #include "klog.h" // IWYU pragma: keep
  #include "selinux/selinux.h"
  #include "su_mount_ns.h"
@@ -210,7 +210,7 @@ index 8bb9b6f1..83c4ef5c 100644
  
  #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 7, 0)
  static struct group_info root_groups = { .usage = REFCOUNT_INIT(2) };
-@@ -95,8 +97,10 @@ static void disable_seccomp(void)
+@@ -105,8 +107,10 @@ static void disable_seccomp(void)
  void escape_with_root_profile(void)
  {
      struct cred *cred;
@@ -221,7 +221,7 @@ index 8bb9b6f1..83c4ef5c 100644
  
      cred = prepare_creds();
      if (!cred) {
-@@ -143,9 +147,11 @@ void escape_with_root_profile(void)
+@@ -153,9 +157,11 @@ void escape_with_root_profile(void)
      disable_seccomp();
  
      setup_selinux(profile->selinux_domain);
@@ -661,7 +661,7 @@ index a7759952..f232b86b 100644
 +
  #endif
 diff --git a/kernel/setuid_hook.c b/kernel/setuid_hook.c
-index 513339cd..057f5cfd 100644
+index 513339cd..1a9020b1 100644
 --- a/kernel/setuid_hook.c
 +++ b/kernel/setuid_hook.c
 @@ -11,6 +11,9 @@
@@ -669,7 +669,7 @@ index 513339cd..057f5cfd 100644
  #include <linux/uaccess.h>
  #include <linux/uidgid.h>
 +#ifdef CONFIG_KSU_SUSFS
-+#include <linux/susfs.h>
++#include <linux/susfs_def.h>
 +#endif // #ifdef CONFIG_KSU_SUSFS
  
  #include "allowlist.h"
