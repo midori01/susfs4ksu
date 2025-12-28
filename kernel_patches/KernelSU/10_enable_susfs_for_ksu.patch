@@ -317,10 +317,10 @@ index b2aabf08..c235486f 100644
      ksu_supercalls_exit();
  
 diff --git a/kernel/ksud.c b/kernel/ksud.c
-index 1c4f9755..7d6d2164 100644
+index 9f4e60ea..257922cc 100644
 --- a/kernel/ksud.c
 +++ b/kernel/ksud.c
-@@ -57,9 +57,15 @@ static void stop_vfs_read_hook();
+@@ -58,9 +58,15 @@ static void stop_vfs_read_hook();
  static void stop_execve_hook();
  static void stop_input_hook();
  
@@ -336,7 +336,7 @@ index 1c4f9755..7d6d2164 100644
  
  u32 ksu_file_sid;
  void on_post_fs_data(void)
-@@ -116,6 +122,7 @@ void on_boot_completed(void)
+@@ -117,6 +123,7 @@ void on_boot_completed(void)
      track_throne(true);
  }
  
@@ -344,7 +344,7 @@ index 1c4f9755..7d6d2164 100644
  #define MAX_ARG_STRINGS 0x7FFFFFFF
  struct user_arg_ptr {
  #ifdef CONFIG_COMPAT
-@@ -128,6 +135,7 @@ struct user_arg_ptr {
+@@ -129,6 +136,7 @@ struct user_arg_ptr {
  #endif
      } ptr;
  };
@@ -352,7 +352,7 @@ index 1c4f9755..7d6d2164 100644
  
  static const char __user *get_user_arg_ptr(struct user_arg_ptr argv, int nr)
  {
-@@ -192,6 +200,10 @@ static void on_post_fs_data_cbfun(struct callback_head *cb)
+@@ -193,6 +201,10 @@ static void on_post_fs_data_cbfun(struct callback_head *cb)
  static struct callback_head on_post_fs_data_cb = { .func =
                                                         on_post_fs_data_cbfun };
  
@@ -363,7 +363,7 @@ index 1c4f9755..7d6d2164 100644
  // IMPORTANT NOTE: the call from execve_handler_pre WON'T provided correct value for envp and flags in GKI version
  int ksu_handle_execveat_ksud(int *fd, struct filename **filename_ptr,
                               struct user_arg_ptr *argv,
-@@ -214,6 +226,14 @@ int ksu_handle_execveat_ksud(int *fd, struct filename **filename_ptr,
+@@ -215,6 +227,14 @@ int ksu_handle_execveat_ksud(int *fd, struct filename **filename_ptr,
          return 0;
      }
  
@@ -378,7 +378,7 @@ index 1c4f9755..7d6d2164 100644
      // https://cs.android.com/android/platform/superproject/+/android-16.0.0_r2:system/core/init/main.cpp;l=77
      if (unlikely(!memcmp(filename->name, system_bin_init,
                           sizeof(system_bin_init) - 1) &&
-@@ -290,6 +310,12 @@ static ssize_t read_iter_proxy(struct kiocb *iocb, struct iov_iter *to)
+@@ -340,6 +360,12 @@ append_ksu_rc:
  static int ksu_handle_vfs_read(struct file **file_ptr, char __user **buf_ptr,
                                 size_t *count_ptr, loff_t **pos)
  {
@@ -389,9 +389,9 @@ index 1c4f9755..7d6d2164 100644
 +#endif // #ifdef CONFIG_KSU_SUSFS
 +
      struct file *file;
-     char __user *buf;
      size_t count;
-@@ -376,8 +402,13 @@ static int ksu_handle_vfs_read(struct file **file_ptr, char __user **buf_ptr,
+ 
+@@ -407,8 +433,13 @@ static int ksu_handle_vfs_read(struct file **file_ptr, char __user **buf_ptr,
      return 0;
  }
  
@@ -405,7 +405,7 @@ index 1c4f9755..7d6d2164 100644
  {
      struct file *file = fget(fd);
      if (!file) {
-@@ -398,6 +429,12 @@ static bool is_volumedown_enough(unsigned int count)
+@@ -429,6 +460,12 @@ static bool is_volumedown_enough(unsigned int count)
  int ksu_handle_input_handle_event(unsigned int *type, unsigned int *code,
                                    int *value)
  {
@@ -418,7 +418,7 @@ index 1c4f9755..7d6d2164 100644
      if (*type == EV_KEY && *code == KEY_VOLUMEDOWN) {
          int val = *value;
          pr_info("KEY_VOLUMEDOWN val: %d\n", val);
-@@ -435,6 +472,7 @@ bool ksu_is_safe_mode()
+@@ -466,6 +503,7 @@ bool ksu_is_safe_mode()
      return false;
  }
  
@@ -426,7 +426,7 @@ index 1c4f9755..7d6d2164 100644
  static int sys_execve_handler_pre(struct kprobe *p, struct pt_regs *regs)
  {
      struct pt_regs *real_regs = PT_REAL_REGS(regs);
-@@ -518,17 +556,28 @@ static void do_stop_input_hook(struct work_struct *work)
+@@ -549,17 +587,28 @@ static void do_stop_input_hook(struct work_struct *work)
  {
      unregister_kprobe(&input_event_kp);
  }
@@ -455,7 +455,7 @@ index 1c4f9755..7d6d2164 100644
  }
  
  static void stop_input_hook()
-@@ -538,13 +587,19 @@ static void stop_input_hook()
+@@ -569,13 +618,19 @@ static void stop_input_hook()
          return;
      }
      input_hook_stopped = true;
@@ -475,7 +475,7 @@ index 1c4f9755..7d6d2164 100644
      int ret;
  
      ret = register_kprobe(&execve_kp);
-@@ -559,12 +614,15 @@ void ksu_ksud_init()
+@@ -590,12 +645,15 @@ void ksu_ksud_init()
      INIT_WORK(&stop_vfs_read_work, do_stop_vfs_read_hook);
      INIT_WORK(&stop_execve_hook_work, do_stop_execve_hook);
      INIT_WORK(&stop_input_hook_work, do_stop_input_hook);
@@ -540,7 +540,7 @@ index fac0d0d7..13d4b600 100644
  }
  
 diff --git a/kernel/selinux/selinux.c b/kernel/selinux/selinux.c
-index c50ef2cd..00b95f79 100644
+index deee0fef..777d3c56 100644
 --- a/kernel/selinux/selinux.c
 +++ b/kernel/selinux/selinux.c
 @@ -164,3 +164,94 @@ u32 ksu_get_ksu_file_sid()
