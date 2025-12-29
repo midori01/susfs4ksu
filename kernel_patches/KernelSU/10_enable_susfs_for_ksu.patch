@@ -661,7 +661,7 @@ index a7759952..f232b86b 100644
 +
  #endif
 diff --git a/kernel/setuid_hook.c b/kernel/setuid_hook.c
-index 513339cd..1a9020b1 100644
+index 15b12123..653e1883 100644
 --- a/kernel/setuid_hook.c
 +++ b/kernel/setuid_hook.c
 @@ -11,6 +11,9 @@
@@ -716,7 +716,7 @@ index 513339cd..1a9020b1 100644
  int ksu_handle_setresuid(uid_t ruid, uid_t euid, uid_t suid)
  {
      // we rely on the fact that zygote always call setresuid(3) with same uids
-@@ -120,6 +148,102 @@ int ksu_handle_setresuid(uid_t ruid, uid_t euid, uid_t suid)
+@@ -121,6 +149,103 @@ int ksu_handle_setresuid(uid_t ruid, uid_t euid, uid_t suid)
  
      return 0;
  }
@@ -765,7 +765,8 @@ index 513339cd..1a9020b1 100644
 +    // - Since ksu maanger app uid is excluded in allow_list_arr, so ksu_uid_should_umount(manager_uid)
 +    //   will always return true, that's why we need to explicitly check if new_uid belongs to
 +    //   ksu manager
-+    if (ksu_get_manager_appid() == new_uid % PER_USER_RANGE) {
++    if (likely(ksu_is_manager_appid_valid()) &&
++        unlikely(ksu_get_manager_appid() == new_uid % PER_USER_RANGE)) {
 +        spin_lock_irq(&current->sighand->siglock);
 +        ksu_seccomp_allow_cache(current->seccomp.filter, __NR_reboot);
 +        spin_unlock_irq(&current->sighand->siglock);
