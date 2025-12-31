@@ -537,10 +537,10 @@ index fac0d0d7..13d4b600 100644
  }
  
 diff --git a/kernel/selinux/selinux.c b/kernel/selinux/selinux.c
-index deee0fef..777d3c56 100644
+index deee0fef..a2169196 100644
 --- a/kernel/selinux/selinux.c
 +++ b/kernel/selinux/selinux.c
-@@ -164,3 +164,94 @@ u32 ksu_get_ksu_file_sid()
+@@ -164,3 +164,99 @@ u32 ksu_get_ksu_file_sid()
      }
      return ksu_file_sid;
  }
@@ -573,8 +573,13 @@ index deee0fef..777d3c56 100644
 +    pr_info("sid '%u' is set for secctx_name '%s'\n", *out_sid, secctx_name);
 +}
 +
-+bool susfs_is_sid_equal(void *sec, u32 sid2) {
-+    struct task_security_struct *tsec = (struct task_security_struct *)sec;
++bool susfs_is_sid_equal(const struct cred *cred, u32 sid2) {
++#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 18, 0)
++    const struct task_security_struct *tsec = selinux_cred(cred);
++#else
++    const struct cred_security_struct *tsec = selinux_cred(cred);
++#endif
++
 +    if (!tsec) {
 +        return false;
 +    }
@@ -636,7 +641,7 @@ index deee0fef..777d3c56 100644
 +}
 +#endif // #ifdef CONFIG_KSU_SUSFS
 diff --git a/kernel/selinux/selinux.h b/kernel/selinux/selinux.h
-index a7759952..f232b86b 100644
+index a7759952..abeb4685 100644
 --- a/kernel/selinux/selinux.h
 +++ b/kernel/selinux/selinux.h
 @@ -34,4 +34,17 @@ int handle_sepolicy(unsigned long arg3, void __user *arg4);
@@ -644,7 +649,7 @@ index a7759952..f232b86b 100644
  void setup_ksu_cred();
  
 +#ifdef CONFIG_KSU_SUSFS
-+bool susfs_is_sid_equal(void *sec, u32 sid2);
++bool susfs_is_sid_equal(const struct cred *cred, u32 sid2);
 +u32 susfs_get_sid_from_name(const char *secctx_name);
 +u32 susfs_get_current_sid(void);
 +void susfs_set_zygote_sid(void);
@@ -658,7 +663,7 @@ index a7759952..f232b86b 100644
 +
  #endif
 diff --git a/kernel/setuid_hook.c b/kernel/setuid_hook.c
-index 15b12123..653e1883 100644
+index 15b12123..f1de6a07 100644
 --- a/kernel/setuid_hook.c
 +++ b/kernel/setuid_hook.c
 @@ -11,6 +11,9 @@
@@ -713,7 +718,7 @@ index 15b12123..653e1883 100644
  int ksu_handle_setresuid(uid_t ruid, uid_t euid, uid_t suid)
  {
      // we rely on the fact that zygote always call setresuid(3) with same uids
-@@ -121,6 +149,103 @@ int ksu_handle_setresuid(uid_t ruid, uid_t euid, uid_t suid)
+@@ -121,6 +149,79 @@ int ksu_handle_setresuid(uid_t ruid, uid_t euid, uid_t suid)
  
      return 0;
  }
@@ -723,32 +728,8 @@ index 15b12123..653e1883 100644
 +    uid_t new_uid = ruid;
 +    uid_t old_uid = current_uid().val;
 +
-+    // if old process is root, ignore it.
-+    if (old_uid != 0 && ksu_enhanced_security_enabled) {
-+        // disallow any non-ksu domain escalation from non-root to root!
-+        // euid is what we care about here as it controls permission
-+        if (unlikely(euid == 0)) {
-+            if (!is_ksu_domain()) {
-+                pr_warn("find suspicious EoP: %d %s, from %d to %d\n", 
-+                    current->pid, current->comm, old_uid, new_uid);
-+                force_sig(SIGKILL);
-+                return 0;
-+            }
-+        }
-+        // disallow appuid decrease to any other uid if it is not allowed to su
-+        if (is_appuid(old_uid)) {
-+            if (euid < current_euid().val && !ksu_is_allow_uid_for_current(old_uid)) {
-+                pr_warn("find suspicious EoP: %d %s, from %d to %d\n", 
-+                    current->pid, current->comm, old_uid, new_uid);
-+                force_sig(SIGKILL);
-+                return 0;
-+            }
-+        }
-+        return 0;
-+    }
-+
 +    // We only interest in process spwaned by zygote
-+    if (!susfs_is_sid_equal(current_cred()->security, susfs_zygote_sid)) {
++    if (!susfs_is_sid_equal(current_cred(), susfs_zygote_sid)) {
 +        return 0;
 +    }
 +
