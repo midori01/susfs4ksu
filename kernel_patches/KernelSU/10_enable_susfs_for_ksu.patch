@@ -663,7 +663,7 @@ index a7759952..abeb4685 100644
 +
  #endif
 diff --git a/kernel/setuid_hook.c b/kernel/setuid_hook.c
-index 15b12123..f1de6a07 100644
+index 849947c1..084bf38b 100644
 --- a/kernel/setuid_hook.c
 +++ b/kernel/setuid_hook.c
 @@ -11,6 +11,9 @@
@@ -676,7 +676,7 @@ index 15b12123..f1de6a07 100644
  
  #include "allowlist.h"
  #include "setuid_hook.h"
-@@ -20,9 +23,33 @@
+@@ -19,15 +22,40 @@
  #include "selinux/selinux.h"
  #include "seccomp_cache.h"
  #include "supercalls.h"
@@ -707,10 +707,9 @@ index 15b12123..f1de6a07 100644
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +#endif // #ifdef CONFIG_KSU_SUSFS
 +
- static bool ksu_enhanced_security_enabled = false;
- 
- static int enhanced_security_feature_get(u64 *value)
-@@ -52,6 +79,7 @@ static void ksu_install_manager_fd_tw_func(struct callback_head *cb)
+ static void ksu_install_manager_fd_tw_func(struct callback_head *cb)
+ {
+     ksu_install_fd();
      kfree(cb);
  }
  
@@ -718,7 +717,7 @@ index 15b12123..f1de6a07 100644
  int ksu_handle_setresuid(uid_t ruid, uid_t euid, uid_t suid)
  {
      // we rely on the fact that zygote always call setresuid(3) with same uids
-@@ -121,6 +149,79 @@ int ksu_handle_setresuid(uid_t ruid, uid_t euid, uid_t suid)
+@@ -72,6 +100,79 @@ int ksu_handle_setresuid(uid_t ruid, uid_t euid, uid_t suid)
  
      return 0;
  }
