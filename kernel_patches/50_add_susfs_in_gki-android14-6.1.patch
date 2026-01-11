@@ -1,4 +1,60 @@
-
+diff --git a/Makefile b/Makefile
+index 83481d773..499a4af78 100644
+--- a/Makefile
++++ b/Makefile
+@@ -1,7 +1,7 @@
+ # SPDX-License-Identifier: GPL-2.0
+ VERSION = 6
+ PATCHLEVEL = 1
+-SUBLEVEL = 134
++SUBLEVEL = 145
+ EXTRAVERSION =
+ NAME = Curry Ramen
+ 
+diff --git a/arch/arm64/configs/gki_defconfig b/arch/arm64/configs/gki_defconfig
+index a91c46394..72a3c204c 100644
+--- a/arch/arm64/configs/gki_defconfig
++++ b/arch/arm64/configs/gki_defconfig
+@@ -91,7 +91,7 @@ CONFIG_ARM_SCMI_CPUFREQ=y
+ CONFIG_VIRTUALIZATION=y
+ CONFIG_KVM=y
+ CONFIG_PKVM_MODULE_PATH="/lib/modules/"
+-CONFIG_KPROBES=y
++CONFIG_KPROBES=n
+ CONFIG_JUMP_LABEL=y
+ CONFIG_SHADOW_CALL_STACK=y
+ CONFIG_CFI_CLANG=y
+diff --git a/arch/arm64/configs/zuma_defconfig b/arch/arm64/configs/zuma_defconfig
+index f8fd4399f..c5c57fc4d 100644
+--- a/arch/arm64/configs/zuma_defconfig
++++ b/arch/arm64/configs/zuma_defconfig
+@@ -1,5 +1,4 @@
+-CONFIG_LOCALVERSION="-Sultan"
+-# CONFIG_LOCALVERSION_AUTO is not set
++CONFIG_LOCALVERSION_AUTO=y
+ CONFIG_IRQ_SBALANCE=y
+ CONFIG_SBALANCE_EXCLUDE_CPUS="3,7,8"
+ CONFIG_NO_HZ=y
+diff --git a/drivers/Kconfig b/drivers/Kconfig
+index 41d64877f..b89145398 100644
+--- a/drivers/Kconfig
++++ b/drivers/Kconfig
+@@ -241,4 +241,5 @@ source "drivers/hte/Kconfig"
+ 
+ source "google-modules/Kconfig"
+ 
++source "drivers/kernelsu/Kconfig"
+ endmenu
+diff --git a/drivers/Makefile b/drivers/Makefile
+index bdf1c6614..d69d75d15 100644
+--- a/drivers/Makefile
++++ b/drivers/Makefile
+@@ -189,3 +189,5 @@ obj-$(CONFIG_COUNTER)		+= counter/
+ obj-$(CONFIG_MOST)		+= most/
+ obj-$(CONFIG_PECI)		+= peci/
+ obj-$(CONFIG_HTE)		+= hte/
++
++obj-$(CONFIG_KSU) += kernelsu/
 diff --git a/drivers/input/input.c b/drivers/input/input.c
 index 78be582b5..bdca57a9e 100644
 --- a/drivers/input/input.c
@@ -1423,24 +1479,23 @@ index 846f9455a..1f6c127ba 100644
  	if (sb->s_op->show_devname) {
  		seq_puts(m, "device ");
 diff --git a/fs/read_write.c b/fs/read_write.c
-index a709aa63a..bb18518ac 100644
+index a709aa63a..8dd0110ef 100644
 --- a/fs/read_write.c
 +++ b/fs/read_write.c
-@@ -650,8 +650,19 @@ ssize_t ksys_read(unsigned int fd, char __user *buf, size_t count)
+@@ -650,8 +650,18 @@ ssize_t ksys_read(unsigned int fd, char __user *buf, size_t count)
  	return ret;
  }
  
 +#ifdef CONFIG_KSU_SUSFS
-+extern bool ksu_vfs_read_hook __read_mostly;
-+extern __attribute__((cold)) int ksu_handle_sys_read(unsigned int fd,
-+               char __user **buf_ptr, size_t *count_ptr);
++extern bool ksu_init_rc_hook __read_mostly;
++extern __attribute__((cold)) void ksu_handle_sys_read(unsigned int fd);
 +#endif
 +
  SYSCALL_DEFINE3(read, unsigned int, fd, char __user *, buf, size_t, count)
  {
 +#ifdef CONFIG_KSU_SUSFS
-+	if (unlikely(ksu_vfs_read_hook))
-+		ksu_handle_sys_read(fd, &buf, &count);
++	if (unlikely(ksu_init_rc_hook))
++		ksu_handle_sys_read(fd);
 +#endif
 +
  	return ksys_read(fd, buf, count);
@@ -1901,7 +1956,7 @@ index f74035b5d..5db26a530 100644
  	if (error >= 0)
  		error = buf.error;
 diff --git a/fs/stat.c b/fs/stat.c
-index ef50573c7..09655171d 100644
+index ef50573c7..96c40b43e 100644
 --- a/fs/stat.c
 +++ b/fs/stat.c
 @@ -19,12 +19,20 @@
@@ -1954,8 +2009,8 @@ index ef50573c7..09655171d 100644
 +extern int ksu_handle_stat(int *dfd, struct filename **filename, int *flags);
 +#else
 +extern int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags);
-+#endif
-+#endif
++#endif // #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
++#endif // #ifdef CONFIG_KSU_SUSFS
 +
  /**
   * vfs_statx - Get basic and extra attributes by filename
@@ -1974,11 +2029,40 @@ index ef50573c7..09655171d 100644
 +	}
 +
 +orig_flow:
-+#endif
++#endif // #ifdef CONFIG_KSU_SUSFS
 +
  	if (flags & ~(AT_SYMLINK_NOFOLLOW | AT_NO_AUTOMOUNT | AT_EMPTY_PATH |
  		      AT_STATX_SYNC_TYPE))
  		return -EINVAL;
+@@ -427,6 +468,12 @@ SYSCALL_DEFINE2(newlstat, const char __user *, filename,
+ 	return cp_new_stat(&stat, statbuf);
+ }
+ 
++
++#ifdef CONFIG_KSU_SUSFS
++extern bool ksu_init_rc_hook __read_mostly;
++extern void ksu_handle_sys_newfstatat(int fd, struct stat __user *statbuf);
++#endif // #ifdef CONFIG_KSU_SUSFS
++
+ #if !defined(__ARCH_WANT_STAT64) || defined(__ARCH_WANT_SYS_NEWFSTATAT)
+ SYSCALL_DEFINE4(newfstatat, int, dfd, const char __user *, filename,
+ 		struct stat __user *, statbuf, int, flag)
+@@ -437,7 +484,15 @@ SYSCALL_DEFINE4(newfstatat, int, dfd, const char __user *, filename,
+ 	error = vfs_fstatat(dfd, filename, &stat, flag);
+ 	if (error)
+ 		return error;
++#ifdef CONFIG_KSU_SUSFS
+ 	return cp_new_stat(&stat, statbuf);
++#else
++	error = cp_new_stat(&stat, statbuf);
++	if (unlikely(ksu_init_rc_hook)) {
++		ksu_handle_sys_newfstatat(dfd, statbuf);
++	}
++	return error;
++#endif // #ifdef CONFIG_KSU_SUSFS
+ }
+ #endif
+ 
 diff --git a/fs/statfs.c b/fs/statfs.c
 index 96d1c3edf..f8d47f5e7 100644
 --- a/fs/statfs.c
@@ -2034,6 +2118,20 @@ index 23baecab7..3207b6107 100644
  } __randomize_layout;
  
  static inline struct user_namespace *mnt_user_ns(const struct vfsmount *mnt)
+diff --git a/init/Makefile b/init/Makefile
+index 8316c23be..022196b12 100644
+--- a/init/Makefile
++++ b/init/Makefile
+@@ -29,7 +29,8 @@ preempt-flag-$(CONFIG_PREEMPT_DYNAMIC)	:= PREEMPT_DYNAMIC
+ preempt-flag-$(CONFIG_PREEMPT_RT)	:= PREEMPT_RT
+ 
+ build-version = $(or $(KBUILD_BUILD_VERSION), $(build-version-auto))
+-build-timestamp = $(or $(KBUILD_BUILD_TIMESTAMP), $(build-timestamp-auto))
++#build-timestamp = $(or $(KBUILD_BUILD_TIMESTAMP), $(build-timestamp-auto))
++build-timestamp = "Mon Oct  6 16:50:48 UTC 2025"
+ 
+ # Maximum length of UTS_VERSION is 64 chars
+ filechk_uts_version = \
 diff --git a/kernel/kallsyms.c b/kernel/kallsyms.c
 index 824bcc7b5..1087f73dd 100644
 --- a/kernel/kallsyms.c
@@ -2117,7 +2215,7 @@ index 344ceaf5e..c2d1a782d 100644
  	if (!ns_capable(pid_ns->user_ns, CAP_SYS_BOOT))
  		return -EPERM;
 diff --git a/kernel/sys.c b/kernel/sys.c
-index d37355e60..e0ea451db 100644
+index 7595dc25d..e0ea451db 100644
 --- a/kernel/sys.c
 +++ b/kernel/sys.c
 @@ -654,6 +654,9 @@ SYSCALL_DEFINE1(setuid, uid_t, uid)
@@ -2141,7 +2239,7 @@ index d37355e60..e0ea451db 100644
  	kruid = make_kuid(ns, ruid);
  	keuid = make_kuid(ns, euid);
  	ksuid = make_kuid(ns, suid);
-@@ -1298,12 +1305,18 @@ static int override_release(char __user *release, size_t len)
+@@ -1298,30 +1305,20 @@ static int override_release(char __user *release, size_t len)
  	return ret;
  }
  
@@ -2151,6 +2249,8 @@ index d37355e60..e0ea451db 100644
  SYSCALL_DEFINE1(newuname, struct new_utsname __user *, name)
  {
  	struct new_utsname tmp;
+-	struct task_struct *t;
+-	bool is_gms = false;
  
  	down_read(&uts_sem);
  	memcpy(&tmp, utsname(), sizeof(tmp));
@@ -2159,7 +2259,34 @@ index d37355e60..e0ea451db 100644
 +#endif
  	up_read(&uts_sem);
  
+-	rcu_read_lock();
+-	for_each_thread(current, t) {
+-		if (thread_group_leader(t)) {
+-			is_gms = !strcmp(t->comm, "id.gms.unstable");
+-			break;
+-		}
+-	}
+-	rcu_read_unlock();
+-
+-	if (is_gms)
+-		snprintf(tmp.release, sizeof(tmp.release), "%u.%u.%u",
+-			 LINUX_VERSION_MAJOR, LINUX_VERSION_PATCHLEVEL,
+-			 LINUX_VERSION_SUBLEVEL);
+-
  	if (copy_to_user(name, &tmp, sizeof(tmp)))
+ 		return -EFAULT;
+ 
+diff --git a/scripts/setlocalversion b/scripts/setlocalversion
+index 1b733ae4c..1db2d4e47 100755
+--- a/scripts/setlocalversion
++++ b/scripts/setlocalversion
+@@ -170,4 +170,5 @@ if test -n "${BUILD_NUMBER}"; then
+ 	res="$res-ab${BUILD_NUMBER}"
+ fi
+ 
+-echo "$res"
++#echo "$res"
++echo "-android14-11-gc1de4747ac59-ab14219743"
 diff --git a/security/selinux/avc.c b/security/selinux/avc.c
 index d93af9249..15e526609 100644
 --- a/security/selinux/avc.c
@@ -2201,65 +2328,3 @@ index d93af9249..15e526609 100644
  	tclass = secclass_map[sad->tclass-1].name;
  	audit_log_format(ab, " tclass=%s", tclass);
  
-diff --git a/arch/arm64/configs/gki_defconfig b/arch/arm64/configs/gki_defconfig
-index a91c46394..72a3c204c 100644
---- a/arch/arm64/configs/gki_defconfig
-+++ b/arch/arm64/configs/gki_defconfig
-@@ -91,7 +91,7 @@ CONFIG_ARM_SCMI_CPUFREQ=y
- CONFIG_VIRTUALIZATION=y
- CONFIG_KVM=y
- CONFIG_PKVM_MODULE_PATH="/lib/modules/"
--CONFIG_KPROBES=y
-+CONFIG_KPROBES=n
- CONFIG_JUMP_LABEL=y
- CONFIG_SHADOW_CALL_STACK=y
- CONFIG_CFI_CLANG=y
-diff --git a/arch/arm64/configs/zuma_defconfig b/arch/arm64/configs/zuma_defconfig
-index f8fd4399f..c5c57fc4d 100644
---- a/arch/arm64/configs/zuma_defconfig
-+++ b/arch/arm64/configs/zuma_defconfig
-@@ -1,5 +1,4 @@
--CONFIG_LOCALVERSION="-Sultan"
--# CONFIG_LOCALVERSION_AUTO is not set
-+CONFIG_LOCALVERSION_AUTO=y
- CONFIG_IRQ_SBALANCE=y
- CONFIG_SBALANCE_EXCLUDE_CPUS="3,7,8"
- CONFIG_NO_HZ=y
-diff --git a/Makefile b/Makefile
-index 83481d773..499a4af78 100644
---- a/Makefile
-+++ b/Makefile
-@@ -1,7 +1,7 @@
- # SPDX-License-Identifier: GPL-2.0
- VERSION = 6
- PATCHLEVEL = 1
--SUBLEVEL = 134
-+SUBLEVEL = 145
- EXTRAVERSION =
- NAME = Curry Ramen
- 
-diff --git a/init/Makefile b/init/Makefile
-index 8316c23be..022196b12 100644
---- a/init/Makefile
-+++ b/init/Makefile
-@@ -29,7 +29,8 @@ preempt-flag-$(CONFIG_PREEMPT_DYNAMIC)	:= PREEMPT_DYNAMIC
- preempt-flag-$(CONFIG_PREEMPT_RT)	:= PREEMPT_RT
- 
- build-version = $(or $(KBUILD_BUILD_VERSION), $(build-version-auto))
--build-timestamp = $(or $(KBUILD_BUILD_TIMESTAMP), $(build-timestamp-auto))
-+#build-timestamp = $(or $(KBUILD_BUILD_TIMESTAMP), $(build-timestamp-auto))
-+build-timestamp = "Mon Oct  6 16:50:48 UTC 2025"
- 
- # Maximum length of UTS_VERSION is 64 chars
- filechk_uts_version = \
-diff --git a/scripts/setlocalversion b/scripts/setlocalversion
-index 1b733ae4c..1db2d4e47 100755
---- a/scripts/setlocalversion
-+++ b/scripts/setlocalversion
-@@ -170,4 +170,5 @@ if test -n "${BUILD_NUMBER}"; then
- 	res="$res-ab${BUILD_NUMBER}"
- fi
- 
--echo "$res"
-+#echo "$res"
-+echo "-android14-11-gc1de4747ac59-ab14219743"
