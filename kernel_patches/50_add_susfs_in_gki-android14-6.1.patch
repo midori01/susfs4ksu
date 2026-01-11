@@ -1956,7 +1956,7 @@ index f74035b5d..5db26a530 100644
  	if (error >= 0)
  		error = buf.error;
 diff --git a/fs/stat.c b/fs/stat.c
-index ef50573c7..96c40b43e 100644
+index ef50573c7..d06632e16 100644
 --- a/fs/stat.c
 +++ b/fs/stat.c
 @@ -19,12 +19,20 @@
@@ -2041,28 +2041,24 @@ index ef50573c7..96c40b43e 100644
 +
 +#ifdef CONFIG_KSU_SUSFS
 +extern bool ksu_init_rc_hook __read_mostly;
-+extern void ksu_handle_sys_newfstatat(int fd, struct stat __user *statbuf);
++extern void ksu_handle_sys_newfstatat(int fd, loff_t *kstat_size_ptr);
 +#endif // #ifdef CONFIG_KSU_SUSFS
 +
  #if !defined(__ARCH_WANT_STAT64) || defined(__ARCH_WANT_SYS_NEWFSTATAT)
  SYSCALL_DEFINE4(newfstatat, int, dfd, const char __user *, filename,
  		struct stat __user *, statbuf, int, flag)
-@@ -437,7 +484,15 @@ SYSCALL_DEFINE4(newfstatat, int, dfd, const char __user *, filename,
+@@ -437,6 +484,11 @@ SYSCALL_DEFINE4(newfstatat, int, dfd, const char __user *, filename,
  	error = vfs_fstatat(dfd, filename, &stat, flag);
  	if (error)
  		return error;
 +#ifdef CONFIG_KSU_SUSFS
- 	return cp_new_stat(&stat, statbuf);
-+#else
-+	error = cp_new_stat(&stat, statbuf);
 +	if (unlikely(ksu_init_rc_hook)) {
-+		ksu_handle_sys_newfstatat(dfd, statbuf);
++		ksu_handle_sys_newfstatat(dfd, &stat.size);
 +	}
-+	return error;
 +#endif // #ifdef CONFIG_KSU_SUSFS
+ 	return cp_new_stat(&stat, statbuf);
  }
  #endif
- 
 diff --git a/fs/statfs.c b/fs/statfs.c
 index 96d1c3edf..f8d47f5e7 100644
 --- a/fs/statfs.c
