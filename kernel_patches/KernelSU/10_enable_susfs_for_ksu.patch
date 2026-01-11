@@ -301,7 +301,7 @@ index b2aabf08..c235486f 100644
      ksu_supercalls_exit();
  
 diff --git a/kernel/ksud.c b/kernel/ksud.c
-index 715f891f..c9014169 100644
+index 715f891f..ea0dfe6b 100644
 --- a/kernel/ksud.c
 +++ b/kernel/ksud.c
 @@ -58,9 +58,15 @@ static void stop_init_rc_hook();
@@ -392,7 +392,7 @@ index 715f891f..c9014169 100644
  static int sys_execve_handler_pre(struct kprobe *p, struct pt_regs *regs)
  {
      struct pt_regs *real_regs = PT_REAL_REGS(regs);
-@@ -608,17 +636,82 @@ static void do_stop_input_hook(struct work_struct *work)
+@@ -608,17 +636,55 @@ static void do_stop_input_hook(struct work_struct *work)
  {
      unregister_kprobe(&input_event_kp);
  }
@@ -407,33 +407,6 @@ index 715f891f..c9014169 100644
 +        pr_info("stat init.rc");
 +        fput(file);
 +        st_size_ptr = (void __user *)statbuf + offsetof(struct stat, st_size);
-+        if (!copy_from_user_nofault(&size, st_size_ptr, sizeof(long))) {
-+            new_size = size + ksu_rc_len;
-+            pr_info("adding ksu_rc_len: %ld -> %ld", size, new_size);
-+            if (!copy_to_user_nofault(st_size_ptr, &new_size, sizeof(long))) {
-+                pr_info("added ksu_rc_len");
-+            } else {
-+                pr_err("add ksu_rc_len failed: statbuf 0x%lx",
-+                       (unsigned long)st_size_ptr);
-+            }
-+        } else {
-+            pr_err("read statbuf 0x%lx failed", (unsigned long)st_size_ptr);
-+        }
-+        return;
-+    }
-+    fput(file);
-+}
-+
-+void __maybe_unused ksu_handle_sys_newfstatat_compat(int fd, struct compat_stat __user *statbuf) {
-+    void __user *st_size_ptr;
-+    long size, new_size;
-+    struct file *file = fget(fd);
-+    if (!file)
-+        return;
-+    if (is_init_rc(file)) {
-+        pr_info("stat init.rc");
-+        fput(file);
-+        st_size_ptr = (void __user *)statbuf + offsetof(struct compat_stat, st_size);
 +        if (!copy_from_user_nofault(&size, st_size_ptr, sizeof(long))) {
 +            new_size = size + ksu_rc_len;
 +            pr_info("adding ksu_rc_len: %ld -> %ld", size, new_size);
@@ -475,7 +448,7 @@ index 715f891f..c9014169 100644
  }
  
  static void stop_input_hook()
-@@ -628,13 +721,19 @@ static void stop_input_hook()
+@@ -628,13 +694,19 @@ static void stop_input_hook()
          return;
      }
      input_hook_stopped = true;
@@ -495,7 +468,7 @@ index 715f891f..c9014169 100644
      int ret;
  
      ret = register_kprobe(&execve_kp);
-@@ -652,12 +751,15 @@ void ksu_ksud_init()
+@@ -652,12 +724,15 @@ void ksu_ksud_init()
      INIT_WORK(&stop_init_rc_hook_work, do_stop_init_rc_hook);
      INIT_WORK(&stop_execve_hook_work, do_stop_execve_hook);
      INIT_WORK(&stop_input_hook_work, do_stop_input_hook);
