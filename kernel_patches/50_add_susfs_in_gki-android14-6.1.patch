@@ -1,31 +1,5 @@
-diff --git a/Makefile b/Makefile
-index 83481d773..499a4af78 100644
---- a/Makefile
-+++ b/Makefile
-@@ -1,7 +1,7 @@
- # SPDX-License-Identifier: GPL-2.0
- VERSION = 6
- PATCHLEVEL = 1
--SUBLEVEL = 134
-+SUBLEVEL = 145
- EXTRAVERSION =
- NAME = Curry Ramen
- 
-diff --git a/arch/arm64/configs/gki_defconfig b/arch/arm64/configs/gki_defconfig
-index a91c46394..72a3c204c 100644
---- a/arch/arm64/configs/gki_defconfig
-+++ b/arch/arm64/configs/gki_defconfig
-@@ -91,7 +91,7 @@ CONFIG_ARM_SCMI_CPUFREQ=y
- CONFIG_VIRTUALIZATION=y
- CONFIG_KVM=y
- CONFIG_PKVM_MODULE_PATH="/lib/modules/"
--CONFIG_KPROBES=y
-+CONFIG_KPROBES=n
- CONFIG_JUMP_LABEL=y
- CONFIG_SHADOW_CALL_STACK=y
- CONFIG_CFI_CLANG=y
 diff --git a/arch/arm64/configs/zuma_defconfig b/arch/arm64/configs/zuma_defconfig
-index f8fd4399f..c5c57fc4d 100644
+index fe125724c..6ee82fedd 100644
 --- a/arch/arm64/configs/zuma_defconfig
 +++ b/arch/arm64/configs/zuma_defconfig
 @@ -1,5 +1,4 @@
@@ -137,7 +111,7 @@ index 4f25015aa..17e9e15af 100644
  		return NULL;
  	return dentry->d_fsdata;
 diff --git a/fs/exec.c b/fs/exec.c
-index 2f0d83b68..e3acefd69 100644
+index 9ba6e0b73..c53e79513 100644
 --- a/fs/exec.c
 +++ b/fs/exec.c
 @@ -64,6 +64,9 @@
@@ -602,7 +576,7 @@ index 1fa36df7b..e997ba39c 100644
  	return filp;
  }
 diff --git a/fs/namespace.c b/fs/namespace.c
-index 59a9f8777..d81355b9e 100644
+index 67d89ebb5..d6206aadd 100644
 --- a/fs/namespace.c
 +++ b/fs/namespace.c
 @@ -32,10 +32,23 @@
@@ -821,7 +795,7 @@ index 59a9f8777..d81355b9e 100644
  
  		INIT_HLIST_NODE(&mnt->mnt_hash);
  		INIT_LIST_HEAD(&mnt->mnt_child);
-@@ -1014,7 +1183,19 @@ struct vfsmount *vfs_create_mount(struct fs_context *fc)
+@@ -1010,7 +1179,19 @@ struct vfsmount *vfs_create_mount(struct fs_context *fc)
  	if (!fc->root)
  		return ERR_PTR(-EINVAL);
  
@@ -841,7 +815,7 @@ index 59a9f8777..d81355b9e 100644
  	if (!mnt)
  		return ERR_PTR(-ENOMEM);
  
-@@ -1101,7 +1282,37 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
+@@ -1097,7 +1278,37 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
  	struct mount *mnt;
  	int err;
  
@@ -879,7 +853,7 @@ index 59a9f8777..d81355b9e 100644
  	if (!mnt)
  		return ERR_PTR(-ENOMEM);
  
-@@ -3493,6 +3704,9 @@ struct mnt_namespace *copy_mnt_ns(unsigned long flags, struct mnt_namespace *ns,
+@@ -3495,6 +3706,9 @@ struct mnt_namespace *copy_mnt_ns(unsigned long flags, struct mnt_namespace *ns,
  	copy_flags = CL_COPY_UNBINDABLE | CL_EXPIRE;
  	if (user_ns != ns->user_ns)
  		copy_flags |= CL_SHARED_TO_SLAVE;
@@ -889,7 +863,7 @@ index 59a9f8777..d81355b9e 100644
  	new = copy_tree(old, old->mnt.mnt_root, copy_flags);
  	if (IS_ERR(new)) {
  		namespace_unlock();
-@@ -4740,3 +4954,36 @@ static int __init init_fs_namespace_sysctls(void)
+@@ -4742,3 +4956,36 @@ static int __init init_fs_namespace_sysctls(void)
  fs_initcall(init_fs_namespace_sysctls);
  
  #endif /* CONFIG_SYSCTL */
@@ -1073,20 +1047,21 @@ index 0894b354b..8500adf31 100644
  		return -EINVAL;
  
 diff --git a/fs/proc/base.c b/fs/proc/base.c
-index 77b3b1efe..3a7b14146 100644
+index b0ec673a2..7298f8d3d 100644
 --- a/fs/proc/base.c
 +++ b/fs/proc/base.c
-@@ -98,6 +98,9 @@
- #include <linux/resctrl.h>
+@@ -100,6 +100,10 @@
  #include <linux/cn_proc.h>
  #include <linux/cpufreq_times.h>
+ #include <linux/dma-buf.h>
 +#ifdef CONFIG_KSU_SUSFS_SUS_MAP
 +#include <linux/susfs_def.h>
 +#endif
++
  #include <trace/events/oom.h>
  #include <trace/hooks/sched.h>
  #include "internal.h"
-@@ -912,6 +915,9 @@ static ssize_t mem_rw(struct file *file, char __user *buf,
+@@ -914,6 +918,9 @@ static ssize_t mem_rw(struct file *file, char __user *buf,
  	ssize_t copied;
  	char *page;
  	unsigned int flags;
@@ -1096,7 +1071,7 @@ index 77b3b1efe..3a7b14146 100644
  
  	if (!mm)
  		return 0;
-@@ -930,6 +936,22 @@ static ssize_t mem_rw(struct file *file, char __user *buf,
+@@ -932,6 +939,22 @@ static ssize_t mem_rw(struct file *file, char __user *buf,
  
  	while (count > 0) {
  		size_t this_len = min_t(size_t, count, PAGE_SIZE);
@@ -1119,7 +1094,7 @@ index 77b3b1efe..3a7b14146 100644
  
  		if (write && copy_from_user(page, buf, this_len)) {
  			copied = -EFAULT;
-@@ -2464,6 +2486,13 @@ proc_map_files_readdir(struct file *file, struct dir_context *ctx)
+@@ -2466,6 +2489,13 @@ proc_map_files_readdir(struct file *file, struct dir_context *ctx)
  	for_each_vma(vmi, vma) {
  		if (!vma->vm_file)
  			continue;
@@ -1134,7 +1109,7 @@ index 77b3b1efe..3a7b14146 100644
  			continue;
  
 diff --git a/fs/proc/bootconfig.c b/fs/proc/bootconfig.c
-index 5a33ebd07..5292a9b3c 100644
+index 5a33ebd07..8d692d833 100644
 --- a/fs/proc/bootconfig.c
 +++ b/fs/proc/bootconfig.c
 @@ -12,8 +12,19 @@
@@ -1157,11 +1132,11 @@ index 5a33ebd07..5292a9b3c 100644
  	if (saved_boot_config)
  		seq_puts(m, saved_boot_config);
  	return 0;
-@@ -49,6 +60,19 @@ static int __init copy_xbc_key_value_list(char *dst, size_t size)
- 		if (!strncmp(key, "androidboot.load_modules_parallel",
+@@ -50,6 +61,20 @@ static int __init copy_xbc_key_value_list(char *dst, size_t size)
  			     XBC_KEYLEN_MAX))
  			continue;
-+#endif
+ #endif
++
 +#ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
 +		/* - System props like 'ro.boot.verifiedbooterror' and 'ro.boot.verifyerrorpart' will be set
 +		 *   if 'androidboot.verifiedbooterror' and 'androidboot.verifyerrorpart' are set in /proc/bootconfig,
@@ -1174,10 +1149,11 @@ index 5a33ebd07..5292a9b3c 100644
 +		{
 +			continue;
 +		}
- #endif
++#endif
  		ret = snprintf(dst, rest(dst, end), "%s = ", key);
  		if (ret < 0)
-@@ -61,8 +85,24 @@ static int __init copy_xbc_key_value_list(char *dst, size_t size)
+ 			break;
+@@ -61,8 +86,24 @@ static int __init copy_xbc_key_value_list(char *dst, size_t size)
  					q = '\'';
  				else
  					q = '"';
@@ -1282,7 +1258,7 @@ index 913bef0d2..f6eac3610 100644
  	show_fd_locks(m, file, files);
  	if (seq_has_overflowed(m))
 diff --git a/fs/proc/task_mmu.c b/fs/proc/task_mmu.c
-index ad5a36558..662c8f65b 100644
+index 0544c1f58..68667b14a 100644
 --- a/fs/proc/task_mmu.c
 +++ b/fs/proc/task_mmu.c
 @@ -21,6 +21,9 @@
@@ -1342,7 +1318,7 @@ index ad5a36558..662c8f65b 100644
  		pgoff = ((loff_t)vma->vm_pgoff) << PAGE_SHIFT;
  	}
  
-@@ -1047,6 +1081,26 @@ static int show_smap(struct seq_file *m, void *v)
+@@ -1060,6 +1094,26 @@ static int show_smap(struct seq_file *m, void *v)
  	if (!vma_pages(vma))
  		goto show_pad;
  
@@ -1369,7 +1345,7 @@ index ad5a36558..662c8f65b 100644
  	smap_gather_stats(vma, &mss, 0);
  
  	show_map_vma(m, vma);
-@@ -1104,7 +1158,20 @@ static int show_smaps_rollup(struct seq_file *m, void *v)
+@@ -1117,7 +1171,20 @@ static int show_smaps_rollup(struct seq_file *m, void *v)
  
  	vma_start = vma->vm_start;
  	do {
@@ -1390,7 +1366,7 @@ index ad5a36558..662c8f65b 100644
  		last_vma_end = vma->vm_end;
  
  		/*
-@@ -1855,6 +1922,9 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
+@@ -1868,6 +1935,9 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
  	unsigned long start_vaddr;
  	unsigned long end_vaddr;
  	int ret = 0, copied = 0;
@@ -1400,7 +1376,7 @@ index ad5a36558..662c8f65b 100644
  
  	if (!mm || !mmget_not_zero(mm))
  		goto out;
-@@ -1911,6 +1981,15 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
+@@ -1924,6 +1994,15 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
  			goto out_free;
  		ret = walk_page_range(mm, start_vaddr, end, &pagemap_ops, &pm);
  		mmap_read_unlock(mm);
@@ -1417,10 +1393,10 @@ index ad5a36558..662c8f65b 100644
  
  		len = min(count, PM_ENTRY_BYTES * pm.pos);
 diff --git a/fs/proc_namespace.c b/fs/proc_namespace.c
-index 846f9455a..1f6c127ba 100644
+index 846f9455a..e76fff655 100644
 --- a/fs/proc_namespace.c
 +++ b/fs/proc_namespace.c
-@@ -12,12 +12,19 @@
+@@ -12,12 +12,20 @@
  #include <linux/security.h>
  #include <linux/fs_struct.h>
  #include <linux/sched/task.h>
@@ -1434,18 +1410,22 @@ index 846f9455a..1f6c127ba 100644
  #include "internal.h"
  
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-+extern bool susfs_hide_sus_mnts_for_all_procs;
++extern bool susfs_hide_sus_mnts_for_non_su_procs;
++extern bool susfs_is_current_ksu_domain(void);
 +#endif
 +
  static __poll_t mounts_poll(struct file *file, poll_table *wait)
  {
  	struct seq_file *m = file->private_data;
-@@ -106,6 +113,12 @@ static int show_vfsmnt(struct seq_file *m, struct vfsmount *mnt)
+@@ -106,6 +114,15 @@ static int show_vfsmnt(struct seq_file *m, struct vfsmount *mnt)
  	struct super_block *sb = mnt_path.dentry->d_sb;
  	int err;
  
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-+	if (susfs_hide_sus_mnts_for_all_procs && r->mnt_id >= DEFAULT_KSU_MNT_ID) {
++	if (susfs_hide_sus_mnts_for_non_su_procs &&
++		r->mnt_id >= DEFAULT_KSU_MNT_ID &&
++		!susfs_is_current_ksu_domain())
++	{
 +		return 0;
 +	}
 +#endif
@@ -1453,24 +1433,31 @@ index 846f9455a..1f6c127ba 100644
  	if (sb->s_op->show_devname) {
  		err = sb->s_op->show_devname(m, mnt_path.dentry);
  		if (err)
-@@ -140,6 +153,11 @@ static int show_mountinfo(struct seq_file *m, struct vfsmount *mnt)
+@@ -140,6 +157,15 @@ static int show_mountinfo(struct seq_file *m, struct vfsmount *mnt)
  	struct path mnt_path = { .dentry = mnt->mnt_root, .mnt = mnt };
  	int err;
  
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-+	if (susfs_hide_sus_mnts_for_all_procs && r->mnt_id >= DEFAULT_KSU_MNT_ID) {
++	if (susfs_hide_sus_mnts_for_non_su_procs &&
++		r->mnt_id >= DEFAULT_KSU_MNT_ID &&
++		!susfs_is_current_ksu_domain())
++	{
 +		return 0;
 +	}
 +#endif
++
  	seq_printf(m, "%i %i %u:%u ", r->mnt_id, r->mnt_parent->mnt_id,
  		   MAJOR(sb->s_dev), MINOR(sb->s_dev));
  	if (sb->s_op->show_path) {
-@@ -202,6 +220,12 @@ static int show_vfsstat(struct seq_file *m, struct vfsmount *mnt)
+@@ -202,6 +228,15 @@ static int show_vfsstat(struct seq_file *m, struct vfsmount *mnt)
  	struct super_block *sb = mnt_path.dentry->d_sb;
  	int err;
  
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-+	if (susfs_hide_sus_mnts_for_all_procs && r->mnt_id >= DEFAULT_KSU_MNT_ID) {
++	if (susfs_hide_sus_mnts_for_non_su_procs &&
++		r->mnt_id >= DEFAULT_KSU_MNT_ID &&
++		!susfs_is_current_ksu_domain())
++	{
 +		return 0;
 +	}
 +#endif
@@ -1502,7 +1489,7 @@ index a709aa63a..8dd0110ef 100644
  }
  
 diff --git a/fs/readdir.c b/fs/readdir.c
-index f74035b5d..5db26a530 100644
+index c44e1afe1..44efd1d53 100644
 --- a/fs/readdir.c
 +++ b/fs/readdir.c
 @@ -24,6 +24,14 @@
@@ -1706,7 +1693,7 @@ index f74035b5d..5db26a530 100644
  	int prev_reclen;
  	int count;
  	int error;
-@@ -400,6 +522,9 @@ static bool filldir64(struct dir_context *ctx, const char *name, int namlen,
+@@ -406,6 +528,9 @@ static bool filldir64(struct dir_context *ctx, const char *name, int namlen,
  	int reclen = ALIGN(offsetof(struct linux_dirent64, d_name) + namlen + 1,
  		sizeof(u64));
  	int prev_reclen;
@@ -1716,7 +1703,7 @@ index f74035b5d..5db26a530 100644
  
  	buf->error = verify_dirent_name(name, namlen);
  	if (unlikely(buf->error))
-@@ -412,6 +537,29 @@ static bool filldir64(struct dir_context *ctx, const char *name, int namlen,
+@@ -418,6 +543,29 @@ static bool filldir64(struct dir_context *ctx, const char *name, int namlen,
  	prev_reclen = buf->prev_reclen;
  	if (prev_reclen && signal_pending(current))
  		return false;
@@ -1746,7 +1733,7 @@ index f74035b5d..5db26a530 100644
  	dirent = buf->current_dir;
  	prev = (void __user *)dirent - prev_reclen;
  	if (!user_write_access_begin(prev, reclen + prev_reclen))
-@@ -447,11 +595,35 @@ SYSCALL_DEFINE3(getdents64, unsigned int, fd,
+@@ -453,11 +601,35 @@ SYSCALL_DEFINE3(getdents64, unsigned int, fd,
  		.current_dir = dirent
  	};
  	int error;
@@ -1782,7 +1769,7 @@ index f74035b5d..5db26a530 100644
  	error = iterate_dir(f.file, &buf.ctx);
  	if (error >= 0)
  		error = buf.error;
-@@ -480,6 +652,11 @@ struct compat_old_linux_dirent {
+@@ -486,6 +658,11 @@ struct compat_old_linux_dirent {
  struct compat_readdir_callback {
  	struct dir_context ctx;
  	struct compat_old_linux_dirent __user *dirent;
@@ -1794,7 +1781,7 @@ index f74035b5d..5db26a530 100644
  	int result;
  };
  
-@@ -491,6 +668,9 @@ static bool compat_fillonedir(struct dir_context *ctx, const char *name,
+@@ -497,6 +674,9 @@ static bool compat_fillonedir(struct dir_context *ctx, const char *name,
  		container_of(ctx, struct compat_readdir_callback, ctx);
  	struct compat_old_linux_dirent __user *dirent;
  	compat_ulong_t d_ino;
@@ -1804,7 +1791,7 @@ index f74035b5d..5db26a530 100644
  
  	if (buf->result)
  		return false;
-@@ -502,6 +682,28 @@ static bool compat_fillonedir(struct dir_context *ctx, const char *name,
+@@ -508,6 +688,28 @@ static bool compat_fillonedir(struct dir_context *ctx, const char *name,
  		buf->result = -EOVERFLOW;
  		return false;
  	}
@@ -1833,7 +1820,7 @@ index f74035b5d..5db26a530 100644
  	buf->result++;
  	dirent = buf->dirent;
  	if (!user_write_access_begin(dirent,
-@@ -530,10 +732,34 @@ COMPAT_SYSCALL_DEFINE3(old_readdir, unsigned int, fd,
+@@ -536,10 +738,34 @@ COMPAT_SYSCALL_DEFINE3(old_readdir, unsigned int, fd,
  		.ctx.actor = compat_fillonedir,
  		.dirent = dirent
  	};
@@ -1868,7 +1855,7 @@ index f74035b5d..5db26a530 100644
  	error = iterate_dir(f.file, &buf.ctx);
  	if (buf.result)
  		error = buf.result;
-@@ -552,6 +778,11 @@ struct compat_linux_dirent {
+@@ -558,6 +784,11 @@ struct compat_linux_dirent {
  struct compat_getdents_callback {
  	struct dir_context ctx;
  	struct compat_linux_dirent __user *current_dir;
@@ -1880,7 +1867,7 @@ index f74035b5d..5db26a530 100644
  	int prev_reclen;
  	int count;
  	int error;
-@@ -567,6 +798,9 @@ static bool compat_filldir(struct dir_context *ctx, const char *name, int namlen
+@@ -573,6 +804,9 @@ static bool compat_filldir(struct dir_context *ctx, const char *name, int namlen
  	int reclen = ALIGN(offsetof(struct compat_linux_dirent, d_name) +
  		namlen + 2, sizeof(compat_long_t));
  	int prev_reclen;
@@ -1890,7 +1877,7 @@ index f74035b5d..5db26a530 100644
  
  	buf->error = verify_dirent_name(name, namlen);
  	if (unlikely(buf->error))
-@@ -582,6 +816,28 @@ static bool compat_filldir(struct dir_context *ctx, const char *name, int namlen
+@@ -588,6 +822,28 @@ static bool compat_filldir(struct dir_context *ctx, const char *name, int namlen
  	prev_reclen = buf->prev_reclen;
  	if (prev_reclen && signal_pending(current))
  		return false;
@@ -1919,7 +1906,7 @@ index f74035b5d..5db26a530 100644
  	dirent = buf->current_dir;
  	prev = (void __user *) dirent - prev_reclen;
  	if (!user_write_access_begin(prev, reclen + prev_reclen))
-@@ -615,11 +871,35 @@ COMPAT_SYSCALL_DEFINE3(getdents, unsigned int, fd,
+@@ -621,11 +877,35 @@ COMPAT_SYSCALL_DEFINE3(getdents, unsigned int, fd,
  		.count = count
  	};
  	int error;
@@ -1956,7 +1943,7 @@ index f74035b5d..5db26a530 100644
  	if (error >= 0)
  		error = buf.error;
 diff --git a/fs/stat.c b/fs/stat.c
-index ef50573c7..d06632e16 100644
+index ef50573c7..c2da0a869 100644
 --- a/fs/stat.c
 +++ b/fs/stat.c
 @@ -19,12 +19,20 @@
@@ -1998,7 +1985,33 @@ index ef50573c7..d06632e16 100644
  	stat->dev = inode->i_sb->s_dev;
  	stat->ino = inode->i_ino;
  	stat->mode = inode->i_mode;
-@@ -199,6 +218,16 @@ int getname_statx_lookup_flags(int flags)
+@@ -172,6 +191,13 @@ EXPORT_SYMBOL(vfs_getattr);
+  *
+  * 0 will be returned on success, and a -ve error code if unsuccessful.
+  */
++
++
++#ifdef CONFIG_KSU_SUSFS
++extern bool ksu_init_rc_hook __read_mostly;
++extern void ksu_handle_vfs_fstat(int fd, loff_t *kstat_size_ptr);
++#endif // #ifdef CONFIG_KSU_SUSFS
++
+ int vfs_fstat(int fd, struct kstat *stat)
+ {
+ 	struct fd f;
+@@ -181,6 +207,11 @@ int vfs_fstat(int fd, struct kstat *stat)
+ 	if (!f.file)
+ 		return -EBADF;
+ 	error = vfs_getattr(&f.file->f_path, stat, STATX_BASIC_STATS, 0);
++#ifdef CONFIG_KSU_SUSFS
++	if (unlikely(ksu_init_rc_hook)) {
++		ksu_handle_vfs_fstat(fd, &stat->size);
++	}
++#endif // #ifdef CONFIG_KSU_SUSFS
+ 	fdput(f);
+ 	return error;
+ }
+@@ -199,6 +230,16 @@ int getname_statx_lookup_flags(int flags)
  	return lookup_flags;
  }
  
@@ -2009,13 +2022,13 @@ index ef50573c7..d06632e16 100644
 +extern int ksu_handle_stat(int *dfd, struct filename **filename, int *flags);
 +#else
 +extern int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags);
-+#endif // #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
-+#endif // #ifdef CONFIG_KSU_SUSFS
++#endif
++#endif
 +
  /**
   * vfs_statx - Get basic and extra attributes by filename
   * @dfd: A file descriptor representing the base dir for a relative filename
-@@ -221,6 +250,18 @@ static int vfs_statx(int dfd, struct filename *filename, int flags,
+@@ -221,6 +262,18 @@ static int vfs_statx(int dfd, struct filename *filename, int flags,
  	unsigned int lookup_flags = getname_statx_lookup_flags(flags);
  	int error;
  
@@ -2029,36 +2042,11 @@ index ef50573c7..d06632e16 100644
 +	}
 +
 +orig_flow:
-+#endif // #ifdef CONFIG_KSU_SUSFS
++#endif
 +
  	if (flags & ~(AT_SYMLINK_NOFOLLOW | AT_NO_AUTOMOUNT | AT_EMPTY_PATH |
  		      AT_STATX_SYNC_TYPE))
  		return -EINVAL;
-@@ -427,6 +468,12 @@ SYSCALL_DEFINE2(newlstat, const char __user *, filename,
- 	return cp_new_stat(&stat, statbuf);
- }
- 
-+
-+#ifdef CONFIG_KSU_SUSFS
-+extern bool ksu_init_rc_hook __read_mostly;
-+extern void ksu_handle_sys_newfstatat(int fd, loff_t *kstat_size_ptr);
-+#endif // #ifdef CONFIG_KSU_SUSFS
-+
- #if !defined(__ARCH_WANT_STAT64) || defined(__ARCH_WANT_SYS_NEWFSTATAT)
- SYSCALL_DEFINE4(newfstatat, int, dfd, const char __user *, filename,
- 		struct stat __user *, statbuf, int, flag)
-@@ -437,6 +484,11 @@ SYSCALL_DEFINE4(newfstatat, int, dfd, const char __user *, filename,
- 	error = vfs_fstatat(dfd, filename, &stat, flag);
- 	if (error)
- 		return error;
-+#ifdef CONFIG_KSU_SUSFS
-+	if (unlikely(ksu_init_rc_hook)) {
-+		ksu_handle_sys_newfstatat(dfd, &stat.size);
-+	}
-+#endif // #ifdef CONFIG_KSU_SUSFS
- 	return cp_new_stat(&stat, statbuf);
- }
- #endif
 diff --git a/fs/statfs.c b/fs/statfs.c
 index 96d1c3edf..f8d47f5e7 100644
 --- a/fs/statfs.c
@@ -2115,7 +2103,7 @@ index 23baecab7..3207b6107 100644
  
  static inline struct user_namespace *mnt_user_ns(const struct vfsmount *mnt)
 diff --git a/init/Makefile b/init/Makefile
-index 8316c23be..022196b12 100644
+index 8316c23be..960cfb5a7 100644
 --- a/init/Makefile
 +++ b/init/Makefile
 @@ -29,7 +29,8 @@ preempt-flag-$(CONFIG_PREEMPT_DYNAMIC)	:= PREEMPT_DYNAMIC
@@ -2124,7 +2112,7 @@ index 8316c23be..022196b12 100644
  build-version = $(or $(KBUILD_BUILD_VERSION), $(build-version-auto))
 -build-timestamp = $(or $(KBUILD_BUILD_TIMESTAMP), $(build-timestamp-auto))
 +#build-timestamp = $(or $(KBUILD_BUILD_TIMESTAMP), $(build-timestamp-auto))
-+build-timestamp = "Mon Oct  6 16:50:48 UTC 2025"
++build-timestamp = "Wed Dec 17 08:45:53 UTC 2025"
  
  # Maximum length of UTS_VERSION is 64 chars
  filechk_uts_version = \
@@ -2211,7 +2199,7 @@ index 344ceaf5e..c2d1a782d 100644
  	if (!ns_capable(pid_ns->user_ns, CAP_SYS_BOOT))
  		return -EPERM;
 diff --git a/kernel/sys.c b/kernel/sys.c
-index 7595dc25d..e0ea451db 100644
+index 7595dc25d..f01800422 100644
 --- a/kernel/sys.c
 +++ b/kernel/sys.c
 @@ -654,6 +654,9 @@ SYSCALL_DEFINE1(setuid, uid_t, uid)
@@ -2235,13 +2223,14 @@ index 7595dc25d..e0ea451db 100644
  	kruid = make_kuid(ns, ruid);
  	keuid = make_kuid(ns, euid);
  	ksuid = make_kuid(ns, suid);
-@@ -1298,30 +1305,20 @@ static int override_release(char __user *release, size_t len)
+@@ -1298,29 +1305,21 @@ static int override_release(char __user *release, size_t len)
  	return ret;
  }
  
 +#ifdef CONFIG_KSU_SUSFS_SPOOF_UNAME
 +extern void susfs_spoof_uname(struct new_utsname* tmp);
 +#endif
++
  SYSCALL_DEFINE1(newuname, struct new_utsname __user *, name)
  {
  	struct new_utsname tmp;
@@ -2250,11 +2239,8 @@ index 7595dc25d..e0ea451db 100644
  
  	down_read(&uts_sem);
  	memcpy(&tmp, utsname(), sizeof(tmp));
-+#ifdef CONFIG_KSU_SUSFS_SPOOF_UNAME
-+	susfs_spoof_uname(&tmp);
-+#endif
- 	up_read(&uts_sem);
- 
+-	up_read(&uts_sem);
+-
 -	rcu_read_lock();
 -	for_each_thread(current, t) {
 -		if (thread_group_leader(t)) {
@@ -2263,17 +2249,20 @@ index 7595dc25d..e0ea451db 100644
 -		}
 -	}
 -	rcu_read_unlock();
--
++#ifdef CONFIG_KSU_SUSFS_SPOOF_UNAME
++	susfs_spoof_uname(&tmp);
++#endif
+ 
 -	if (is_gms)
 -		snprintf(tmp.release, sizeof(tmp.release), "%u.%u.%u",
 -			 LINUX_VERSION_MAJOR, LINUX_VERSION_PATCHLEVEL,
 -			 LINUX_VERSION_SUBLEVEL);
--
++	up_read(&uts_sem);
+ 
  	if (copy_to_user(name, &tmp, sizeof(tmp)))
  		return -EFAULT;
- 
 diff --git a/scripts/setlocalversion b/scripts/setlocalversion
-index 1b733ae4c..1db2d4e47 100755
+index 1b733ae4c..d0ec12eda 100755
 --- a/scripts/setlocalversion
 +++ b/scripts/setlocalversion
 @@ -170,4 +170,5 @@ if test -n "${BUILD_NUMBER}"; then
@@ -2282,7 +2271,7 @@ index 1b733ae4c..1db2d4e47 100755
  
 -echo "$res"
 +#echo "$res"
-+echo "-android14-11-gc1de4747ac59-ab14219743"
++echo "-android14-11-gb812b232b095-ab14605088"
 diff --git a/security/selinux/avc.c b/security/selinux/avc.c
 index d93af9249..15e526609 100644
 --- a/security/selinux/avc.c
