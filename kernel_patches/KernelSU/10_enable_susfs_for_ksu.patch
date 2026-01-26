@@ -11,7 +11,7 @@ index 70511859..5ee1c52f 100644
  kernelsu-objs += pkg_observer.o
  kernelsu-objs += setuid_hook.o
 diff --git a/kernel/Kconfig b/kernel/Kconfig
-index cc4dbb3a..c9bb4fc0 100644
+index cc4dbb3a..a5c52f9d 100644
 --- a/kernel/Kconfig
 +++ b/kernel/Kconfig
 @@ -1,20 +1,109 @@
@@ -86,7 +86,7 @@ index cc4dbb3a..c9bb4fc0 100644
 +config KSU_SUSFS_SPOOF_UNAME
 +    bool "Enable to spoof uname"
 +    depends on KSU_SUSFS
-+    default n
++    default y
 +    help
 +        - Allow spoofing the string returned by uname syscall to user-defined string.
 +        - Effective on all processes.

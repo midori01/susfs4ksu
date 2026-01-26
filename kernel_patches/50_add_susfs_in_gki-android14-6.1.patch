@@ -9,26 +9,6 @@ index fe125724c..6ee82fedd 100644
  CONFIG_IRQ_SBALANCE=y
  CONFIG_SBALANCE_EXCLUDE_CPUS="3,7,8"
  CONFIG_NO_HZ=y
-diff --git a/drivers/Kconfig b/drivers/Kconfig
-index 41d64877f..b89145398 100644
---- a/drivers/Kconfig
-+++ b/drivers/Kconfig
-@@ -241,4 +241,5 @@ source "drivers/hte/Kconfig"
- 
- source "google-modules/Kconfig"
- 
-+source "drivers/kernelsu/Kconfig"
- endmenu
-diff --git a/drivers/Makefile b/drivers/Makefile
-index bdf1c6614..d69d75d15 100644
---- a/drivers/Makefile
-+++ b/drivers/Makefile
-@@ -189,3 +189,5 @@ obj-$(CONFIG_COUNTER)		+= counter/
- obj-$(CONFIG_MOST)		+= most/
- obj-$(CONFIG_PECI)		+= peci/
- obj-$(CONFIG_HTE)		+= hte/
-+
-+obj-$(CONFIG_KSU) += kernelsu/
 diff --git a/drivers/input/input.c b/drivers/input/input.c
 index 78be582b5..bdca57a9e 100644
 --- a/drivers/input/input.c
@@ -2103,7 +2083,7 @@ index 23baecab7..3207b6107 100644
  
  static inline struct user_namespace *mnt_user_ns(const struct vfsmount *mnt)
 diff --git a/init/Makefile b/init/Makefile
-index 8316c23be..960cfb5a7 100644
+index 8316c23be..022196b12 100644
 --- a/init/Makefile
 +++ b/init/Makefile
 @@ -29,7 +29,8 @@ preempt-flag-$(CONFIG_PREEMPT_DYNAMIC)	:= PREEMPT_DYNAMIC
@@ -2112,7 +2092,7 @@ index 8316c23be..960cfb5a7 100644
  build-version = $(or $(KBUILD_BUILD_VERSION), $(build-version-auto))
 -build-timestamp = $(or $(KBUILD_BUILD_TIMESTAMP), $(build-timestamp-auto))
 +#build-timestamp = $(or $(KBUILD_BUILD_TIMESTAMP), $(build-timestamp-auto))
-+build-timestamp = "Wed Dec 17 08:45:53 UTC 2025"
++build-timestamp = "Mon Oct  6 16:50:48 UTC 2025"
  
  # Maximum length of UTS_VERSION is 64 chars
  filechk_uts_version = \
@@ -2262,7 +2242,7 @@ index 7595dc25d..f01800422 100644
  	if (copy_to_user(name, &tmp, sizeof(tmp)))
  		return -EFAULT;
 diff --git a/scripts/setlocalversion b/scripts/setlocalversion
-index 1b733ae4c..d0ec12eda 100755
+index 1b733ae4c..1db2d4e47 100755
 --- a/scripts/setlocalversion
 +++ b/scripts/setlocalversion
 @@ -170,4 +170,5 @@ if test -n "${BUILD_NUMBER}"; then
@@ -2271,7 +2251,7 @@ index 1b733ae4c..d0ec12eda 100755
  
 -echo "$res"
 +#echo "$res"
-+echo "-android14-11-gb812b232b095-ab14605088"
++echo "-android14-11-gc1de4747ac59-ab14219743"
 diff --git a/security/selinux/avc.c b/security/selinux/avc.c
 index d93af9249..15e526609 100644
 --- a/security/selinux/avc.c

@@ -1,11 +1,11 @@
 ## Introduction ##
 This branch is exclusive for pixel8 (Shiba) only, it is based on latest sultan zuma kernel branch 16.0.0-sultan and official KernelSU fork
 
-- Sultan kernel for zuma: https://github.com/kerneltoast/android_kernel_google_zuma
+- Sultan kernel for zuma: https://github.com/kerneltoast/android_kernel_google_tensynos
 
 - Official KernelSU: https://github.com/tiann/KernelSU
 
-- Based on Factory Images with Security Patch 2025-12-05
+- Based on Factory Images with Security Patch 2026-01-05
 
 ## Requirements ##
 - Full Stock Factory Pixel 8 (Shiba) images
@@ -15,6 +15,7 @@ This branch is exclusive for pixel8 (Shiba) only, it is based on latest sultan z
 ## Features ##
 - Minimal SUSFS features which by default enables only the following:
     * CONFIG_KSU_SUSFS_SUS_MOUNT
+    * CONFIG_KSU_SUSFS_SPOOF_UNAME
     * CONFIG_KSU_SUSFS_ENABLE_LOG
     * CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS
     * CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
@@ -44,7 +45,7 @@ This branch is exclusive for pixel8 (Shiba) only, it is based on latest sultan z
 - KernelSU: https://github.com/tiann/KernelSU
 - KernelSU fork: https://github.com/5ec1cff/KernelSU
 - @Kartatz: for ideas and original commit from https://github.com/Dominium-Apum/kernel_xiaomi_chime/pull/1/commits/74f8d4ecacd343432bb8137b7e7fbe3fd9fef189
-- Sultan Kernel: https://github.com/kerneltoast/android_kernel_google_zuma
+- Sultan Kernel: https://github.com/kerneltoast/android_kernel_google_tensynos
 
 ## Telegram ##
 - @simonpunk
