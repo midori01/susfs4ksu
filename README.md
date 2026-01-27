@@ -1,5 +1,5 @@
 ## Introduction ##
-This branch is exclusive for pixel8 (Shiba) only, it is based on latest sultan zuma kernel branch 16.0.0-sultan and official KernelSU fork
+This branch is exclusive for pixel8 (Shiba) only, it is based on latest sultan unified kernel repo 'android_kernel_google_tensynos' with branch '16.0.0-sultan' and the official KernelSU
 
 - Sultan kernel for zuma: https://github.com/kerneltoast/android_kernel_google_tensynos
 
@@ -23,9 +23,16 @@ This branch is exclusive for pixel8 (Shiba) only, it is based on latest sultan z
 
 - Users may enable the disabled features by themselves such as SUS_PATH, SUS_KSTAT, OPEN_REDIRECT, etc..
 
-- Bypass the kprobe and tracepoint hooks used by the official KSU and MKSU, all susfs hooks are fully inlined now, including sucompat hooks.
+- Bypass the kprobe and tracepoint hooks used by the official KSU, all susfs hooks are fully inlined now, including sucompat hooks.
 
-- Reverted the original uname spoof, a stock uname is already spoofed during compile time
+- Reverted the original uname spoof, a stock uname is already spoofed during compile time, for a complete spoof of /proc/version, you can do the following steps before building the kernel, for instance:
+  1. `export KBUILD_BUILD_VERSION="1"`
+  2. `export KBUILD_BUILD_USER="build-user"`
+  3. `export KBUILD_BUILD_HOST="build-host"`
+  4. `export KBUILD_BUILD_TIMESTAMP="Mon Oct  6 16:50:48 UTC 2025"`
+  5. `export BUILD_NUMBER="14587043"`
+  6. `echo 0 > out/.version`
+  7. `sed -i 's@^#define LINUX_COMPILER.*$@#define LINUX_COMPILER		"Android (10087095, +pgo, +bolt, +lto, -mlgo, based on r487747c) clang version 17.0.2 (https://android.googlesource.com/toolchain/llvm-project d9f89f4d16663d5012e5c09495f3b30ece3d2362), LLD 17.0.2"@g' scripts/mkcompile_h`
 
 ## Apply SUSFS patches ##
 1. Clone this susfs branch with a **tag / release tag** or up to a commit message containing **"Bump version to vX.X.X"**, as they are more stable in general.
