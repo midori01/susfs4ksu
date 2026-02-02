@@ -1033,7 +1033,7 @@ static int susfs_sdcard_monitor_fn(void *data)
 
 			goto out_finish;
 		}
-		
+
 		max_attempts--;
 		SUSFS_LOGI("%d attempts left\n", max_attempts);
 		msleep(SDCARD_MONITOR_INTERVAL_MS);
@@ -1051,6 +1051,8 @@ void susfs_start_sdcard_monitor_fn(void) {
 	susfs_sdcard_monitor_thread = kthread_run(susfs_sdcard_monitor_fn, NULL, "susfs_sdcard_monitor");
 	if (IS_ERR(susfs_sdcard_monitor_thread)) {
 		SUSFS_LOGE("Failed to create thread susfs_sdcard_monitor\n");
+		SUSFS_LOGI("set susfs_is_sdcard_android_data_decrypted to true\n");
+		susfs_is_sdcard_android_data_decrypted = true;
 	}
 }
 
