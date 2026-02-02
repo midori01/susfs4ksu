@@ -181,7 +181,7 @@ index 511e91fc..95e7cfe8 100644
  
      return result;
 diff --git a/kernel/app_profile.c b/kernel/app_profile.c
-index 7bfedeac..a24006ea 100644
+index 6662aeeb..f1758944 100644
 --- a/kernel/app_profile.c
 +++ b/kernel/app_profile.c
 @@ -13,7 +13,9 @@
@@ -206,9 +206,9 @@ index 7bfedeac..a24006ea 100644
      cred = prepare_creds();
      if (!cred) {
 @@ -153,9 +157,11 @@ void escape_with_root_profile(void)
+ 
      disable_seccomp();
  
-     setup_selinux(profile->selinux_domain);
 +#ifndef CONFIG_KSU_SUSFS
      for_each_thread (p, t) {
          ksu_set_task_tracepoint_flag(t);
@@ -523,7 +523,7 @@ index fac0d0d7..13d4b600 100644
  }
  
 diff --git a/kernel/selinux/selinux.c b/kernel/selinux/selinux.c
-index ff66c1f2..7ef9b218 100644
+index b477d59c..66ff25b9 100644
 --- a/kernel/selinux/selinux.c
 +++ b/kernel/selinux/selinux.c
 @@ -207,3 +207,99 @@ bool is_init(const struct cred *cred)
@@ -627,7 +627,7 @@ index ff66c1f2..7ef9b218 100644
 +}
 +#endif // #ifdef CONFIG_KSU_SUSFS
 diff --git a/kernel/selinux/selinux.h b/kernel/selinux/selinux.h
-index 734196fe..562ae0d4 100644
+index a4ab96e8..7bec5ed4 100644
 --- a/kernel/selinux/selinux.h
 +++ b/kernel/selinux/selinux.h
 @@ -36,4 +36,17 @@ int handle_sepolicy(unsigned long arg3, void __user *arg4);
