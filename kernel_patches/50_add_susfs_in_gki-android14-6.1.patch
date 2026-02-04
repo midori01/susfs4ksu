@@ -545,7 +545,7 @@ index 1fa36df7b..e997ba39c 100644
  	return filp;
  }
 diff --git a/fs/namespace.c b/fs/namespace.c
-index 67d89ebb5..61b12b580 100644
+index 67d89ebb5..a4dd62476 100644
 --- a/fs/namespace.c
 +++ b/fs/namespace.c
 @@ -32,10 +32,22 @@
@@ -600,12 +600,12 @@ index 67d89ebb5..61b12b580 100644
 +	int res;
 +
 +	/* - mnt_alloc_group_id will unlikely get called after screen is unlocked,
-+	 *   so here we can keep checking if mnt->mnt_id is sus all the time,
++	 *   so here we can keep checking if current is ksu domain all the time,
 +	 *   and assign sus mnt->mnt_group_id if so.
 +	 * - Also we can reuse the original mnt_group_ida but starting with DEFAULT_KSU_MNT_GROUP_ID
-+	 *   so we do not need to use new ida and hook mnt_release_group_id for this.
++	 *   so there is no need to use another ida and hook mnt_release_group_id for this.
 +	 */
-+	if (mnt->mnt_id >= DEFAULT_KSU_MNT_ID) {
++	if (susfs_is_current_ksu_domain()) {
 +		res = ida_alloc_min(&mnt_group_ida, DEFAULT_KSU_MNT_GROUP_ID, GFP_KERNEL);
 +		goto bypass_orig_flow;
 +	}
