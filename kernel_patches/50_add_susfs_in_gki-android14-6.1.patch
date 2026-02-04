@@ -545,7 +545,7 @@ index 1fa36df7b..e997ba39c 100644
  	return filp;
  }
 diff --git a/fs/namespace.c b/fs/namespace.c
-index 67d89ebb5..a4dd62476 100644
+index 67d89ebb5..ab99ef041 100644
 --- a/fs/namespace.c
 +++ b/fs/namespace.c
 @@ -32,10 +32,22 @@
@@ -599,11 +599,11 @@ index 67d89ebb5..a4dd62476 100644
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +	int res;
 +
-+	/* - mnt_alloc_group_id will unlikely get called after screen is unlocked,
-+	 *   so here we can keep checking if current is ksu domain all the time,
-+	 *   and assign sus mnt->mnt_group_id if so.
-+	 * - Also we can reuse the original mnt_group_ida but starting with DEFAULT_KSU_MNT_GROUP_ID
-+	 *   so there is no need to use another ida and hook mnt_release_group_id for this.
++	/* - mnt_alloc_group_id will unlikely get called after screen is unlocked on reboot,
++	 *   so here we can persistently check if current is ksu domain, and assign a sus
++	 *   mnt_group_id if so.
++	 * - Also we can re-use the original mnt_group_ida so there is no need to use
++	 *   another ida nor hook the mnt_release_group_id() function.
 +	 */
 +	if (susfs_is_current_ksu_domain()) {
 +		res = ida_alloc_min(&mnt_group_ida, DEFAULT_KSU_MNT_GROUP_ID, GFP_KERNEL);
