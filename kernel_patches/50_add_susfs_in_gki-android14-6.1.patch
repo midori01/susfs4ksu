@@ -133,7 +133,7 @@ index 9ba6e0b73..be8030379 100644
  	 * We move the actual failure in case of RLIMIT_NPROC excess from
  	 * set*uid() to execve() because too many poorly written programs
 diff --git a/fs/namei.c b/fs/namei.c
-index 1fa36df7b..faf55f534 100644
+index 1fa36df7b..0e2dfb80b 100644
 --- a/fs/namei.c
 +++ b/fs/namei.c
 @@ -40,10 +40,18 @@
@@ -204,7 +204,7 @@ index 1fa36df7b..faf55f534 100644
  	int status = 1;
 +#ifdef CONFIG_KSU_SUSFS_SUS_PATH
 +	unsigned int backup_next_seq = nd->next_seq;
-+	bool is_nd_state_lookup_last_and_open_last = (nd->state & ND_STATE_LOOKUP_LAST || nd->state & ND_STATE_OPEN_LAST);
++	bool is_nd_state_lookup_last_and_open_last = (nd->state & (ND_STATE_LOOKUP_LAST | ND_STATE_OPEN_LAST));
 +#endif
  
  	/*
@@ -295,16 +295,17 @@ index 1fa36df7b..faf55f534 100644
  		dentry = lookup_slow(&nd->last, nd->path.dentry, nd->flags);
  		if (IS_ERR(dentry))
  			return ERR_CAST(dentry);
-@@ -2261,12 +2345,23 @@ static int link_path_walk(const char *name, struct nameidata *nd)
- 		const char *link;
- 		u64 hash_len;
- 		int type;
+@@ -2257,6 +2341,9 @@ static int link_path_walk(const char *name, struct nameidata *nd)
+ 
+ 	/* At this point we know we have a real path component. */
+ 	for(;;) {
 +#ifdef CONFIG_KSU_SUSFS_SUS_PATH
 +		struct dentry *dentry;
 +#endif
- 
- 		mnt_userns = mnt_user_ns(nd->path.mnt);
- 		err = may_lookup(mnt_userns, nd);
+ 		struct user_namespace *mnt_userns;
+ 		const char *link;
+ 		u64 hash_len;
+@@ -2267,6 +2354,14 @@ static int link_path_walk(const char *name, struct nameidata *nd)
  		if (err)
  			return err;
  
@@ -1592,7 +1593,7 @@ index c44e1afe1..04a0360b9 100644
  	if (error >= 0)
  		error = buf.error;
 diff --git a/fs/stat.c b/fs/stat.c
-index ef50573c7..16acbd9c8 100644
+index ef50573c7..1478d308c 100644
 --- a/fs/stat.c
 +++ b/fs/stat.c
 @@ -19,12 +19,20 @@
@@ -1621,8 +1622,8 @@ index ef50573c7..16acbd9c8 100644
  		      struct kstat *stat)
  {
 +#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
-+	if (likely(susfs_is_current_proc_umounted()) &&
-+		unlikely(test_bit(AS_FLAGS_SUS_KSTAT, &inode->i_mapping->flags)))
++	if (unlikely(test_bit(AS_FLAGS_SUS_KSTAT, &inode->i_mapping->flags)) &&
++		likely(susfs_is_current_proc_umounted()))
 +	{
 +		susfs_sus_ino_for_generic_fillattr(inode->i_ino, stat);
 +		stat->mode = inode->i_mode;
