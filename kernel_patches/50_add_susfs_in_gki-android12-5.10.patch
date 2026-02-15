@@ -1074,7 +1074,7 @@ index 6b634c0a9..fad33a3c6 100644
  	show_fd_locks(m, file, files);
  	if (seq_has_overflowed(m))
 diff --git a/fs/proc/task_mmu.c b/fs/proc/task_mmu.c
-index 839b6d686..8453bb4b2 100644
+index 839b6d686..a71f6d341 100644
 --- a/fs/proc/task_mmu.c
 +++ b/fs/proc/task_mmu.c
 @@ -20,6 +20,9 @@
@@ -1193,10 +1193,10 @@ index 839b6d686..8453bb4b2 100644
  
  	if (!mm || !mmget_not_zero(mm))
  		goto out;
-@@ -1751,6 +1822,17 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
+@@ -1750,6 +1821,17 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
+ 		if (ret)
  			goto out_free;
  		ret = walk_page_range(mm, start_vaddr, end, &pagemap_ops, &pm);
- 		mmap_read_unlock(mm);
 +#ifdef CONFIG_KSU_SUSFS_SUS_MAP
 +		vma = find_vma(mm, start_vaddr);
 +		if (vma && vma->vm_file) {
@@ -1208,9 +1208,9 @@ index 839b6d686..8453bb4b2 100644
 +			}
 +		}
 +#endif
+ 		mmap_read_unlock(mm);
  		start_vaddr = end;
  
- 		len = min(count, PM_ENTRY_BYTES * pm.pos);
 diff --git a/fs/proc_namespace.c b/fs/proc_namespace.c
 index eafb75755..a1a6c2590 100644
 --- a/fs/proc_namespace.c
