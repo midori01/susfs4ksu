@@ -134,7 +134,7 @@ index 71bd99ce8..2e13aa630 100644
  	 * We move the actual failure in case of RLIMIT_NPROC excess from
  	 * set*uid() to execve() because too many poorly written programs
 diff --git a/fs/namei.c b/fs/namei.c
-index b31b583f1..45e33c1a5 100644
+index b31b583f1..569a33a2f 100644
 --- a/fs/namei.c
 +++ b/fs/namei.c
 @@ -41,10 +41,18 @@
@@ -149,7 +149,7 @@ index b31b583f1..45e33c1a5 100644
  #include "mount.h"
  
 +#ifdef CONFIG_KSU_SUSFS_SUS_PATH
-+extern bool susfs_is_inode_sus_path(struct inode *inode);
++extern bool susfs_is_inode_sus_path(struct mnt_idmap* idmap, struct inode *inode);
 +extern const struct qstr susfs_fake_qstr_name;
 +#endif
 +
@@ -1420,7 +1420,7 @@ index 066490235..a32900a6e 100644
  }
  
 diff --git a/fs/readdir.c b/fs/readdir.c
-index c8c46e294..0a7653f46 100644
+index c8c46e294..164bdc4f9 100644
 --- a/fs/readdir.c
 +++ b/fs/readdir.c
 @@ -24,6 +24,10 @@
@@ -1429,7 +1429,7 @@ index c8c46e294..0a7653f46 100644
  
 +#ifdef CONFIG_KSU_SUSFS_SUS_PATH
 +#include <linux/susfs_def.h>
-+extern bool susfs_is_inode_sus_path(struct inode *inode);
++extern bool susfs_is_inode_sus_path(struct mnt_idmap* idmap, struct inode *inode);
 +#endif
  /*
   * Some filesystems were never converted to '->iterate_shared()'
