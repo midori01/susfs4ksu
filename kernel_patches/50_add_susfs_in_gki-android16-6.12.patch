@@ -562,7 +562,7 @@ index bdc243fc4..f83b3cd37 100644
  	if ((flags & RENAME_NOREPLACE) && d_is_positive(new_dentry))
  		goto exit5;
 diff --git a/fs/namespace.c b/fs/namespace.c
-index 6739e1c04..460f4d328 100644
+index 6739e1c04..ac7c93189 100644
 --- a/fs/namespace.c
 +++ b/fs/namespace.c
 @@ -33,11 +33,25 @@
@@ -874,7 +874,7 @@ index 6739e1c04..460f4d328 100644
  		if (r->mnt_id_unique == mnt_parent_id)
  			continue;
  		if (!is_path_reachable(r, r->mnt.mnt_root, &orig))
-@@ -5911,3 +6134,37 @@ static int __init init_fs_namespace_sysctls(void)
+@@ -5911,3 +6134,41 @@ static int __init init_fs_namespace_sysctls(void)
  fs_initcall(init_fs_namespace_sysctls);
  
  #endif /* CONFIG_SYSCTL */
@@ -883,7 +883,8 @@ index 6739e1c04..460f4d328 100644
 +/* Reorder the mnt_id after all sus mounts are umounted during ksu_handle_setuid() */
 +void susfs_reorder_mnt_id(void) {
 +	struct mnt_namespace *mnt_ns = current->nsproxy->mnt_ns;
-+	struct mount *r, *first;
++	struct mount *mnt;
++	struct rb_node *node;
 +	int first_mnt_id = 0;
 +
 +	// Do not reorder the mnt_id if there is no any ksu mount at all
@@ -893,17 +894,20 @@ index 6739e1c04..460f4d328 100644
 +	down_read(&namespace_sem); // needed when manipulating mnt_namespace
 +	lock_mount_hash(); // needed when modifying mount
 +
-+	first = node_to_mount(rb_first(&mnt_ns->mounts));
-+	if (!first)
++	node = mnt_ns->mounts.rb_node;
++	if (!node) {
 +		goto out_unlock_mount_hash;
++	}
 +
-+	first_mnt_id = first->mnt_id;
++	first_mnt_id = node_to_mount(node)->mnt_id;
 +
-+	for (r = first; r; r = listmnt_next(r, false)) {
-+		if (r->mnt_id == DEFAULT_KSU_MNT_ID)
++	for (; node; node = rb_next(node)) {
++		mnt = node_to_mount(node);
++		if (mnt->mnt_id == DEFAULT_KSU_MNT_ID) {
 +			continue;
-+		WRITE_ONCE(r->mnt.susfs_mnt_id_backup, READ_ONCE(r->mnt_id));
-+		WRITE_ONCE(r->mnt_id, first_mnt_id++);
++		}
++		WRITE_ONCE(mnt->mnt.susfs_mnt_id_backup, READ_ONCE(mnt->mnt_id));
++		WRITE_ONCE(mnt->mnt_id, first_mnt_id++);
 +	}
 +
 +out_unlock_mount_hash:
