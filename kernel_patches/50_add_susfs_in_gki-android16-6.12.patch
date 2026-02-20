@@ -562,7 +562,7 @@ index bdc243fc4..f83b3cd37 100644
  	if ((flags & RENAME_NOREPLACE) && d_is_positive(new_dentry))
  		goto exit5;
 diff --git a/fs/namespace.c b/fs/namespace.c
-index 6739e1c04..b0d07db7a 100644
+index 6739e1c04..beedd2e43 100644
 --- a/fs/namespace.c
 +++ b/fs/namespace.c
 @@ -33,11 +33,23 @@
@@ -874,7 +874,7 @@ index 6739e1c04..b0d07db7a 100644
  		if (r->mnt_id_unique == mnt_parent_id)
  			continue;
  		if (!is_path_reachable(r, r->mnt.mnt_root, &orig))
-@@ -5911,3 +6128,45 @@ static int __init init_fs_namespace_sysctls(void)
+@@ -5911,3 +6128,57 @@ static int __init init_fs_namespace_sysctls(void)
  fs_initcall(init_fs_namespace_sysctls);
  
  #endif /* CONFIG_SYSCTL */
@@ -882,11 +882,14 @@ index 6739e1c04..b0d07db7a 100644
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +/* Reorder the mnt_id after all sus mounts are umounted during ksu_handle_setuid() */
 +void susfs_reorder_mnt_id(void) {
-+	struct mnt_namespace *mnt_ns = current->nsproxy->mnt_ns;
-+	struct mount *mnt;
++	struct mnt_namespace *ns = current->nsproxy->mnt_ns;
++	struct mount *mnt, *first_mnt;
 +	struct rb_node *node;
-+	int first_mnt_id = 0;
++	struct path orig;
++	size_t nr_mnt_ids = 10000; // assume 10000 for the maximum list of mounts
++	u64 mnt_parent_id = MNT_UNIQUE_ID_OFFSET + 1;
 +	u64 first_mnt_id_unique = 0;
++	int first_mnt_id = 0;
 +
 +	// Do not reorder the mnt_id if there is no any ksu mount at all
 +	if (atomic64_read(&susfs_ksu_mounts) == 0)
@@ -895,23 +898,32 @@ index 6739e1c04..b0d07db7a 100644
 +	down_read(&namespace_sem); // needed when manipulating mnt_namespace
 +	lock_mount_hash(); // needed when modifying mount
 +
-+	node = mnt_ns->mounts.rb_node;
++	orig.mnt = lookup_mnt_in_ns(mnt_parent_id, ns);
++	if (!orig.mnt)
++		goto out_unlock_mount_hash;
++	orig.dentry = orig.mnt->mnt_root;
++
++	node = rb_first(&ns->mounts);
 +	if (!node) {
 +		goto out_unlock_mount_hash;
 +	}
++	first_mnt = node_to_mount(node);
++	first_mnt_id = first_mnt->mnt_id;
++	first_mnt_id_unique = first_mnt->mnt_id_unique;
 +
-+	first_mnt_id = node_to_mount(node)->mnt_id;
-+	first_mnt_id_unique = node_to_mount(node)->mnt_id_unique;
-+
-+	for (; node; node = rb_next(node)) {
-+		mnt = node_to_mount(node);
++	for (mnt = first_mnt; mnt && nr_mnt_ids; mnt = listmnt_next(mnt, false)) {
 +		if (mnt->mnt_id == DEFAULT_KSU_MNT_ID) {
 +			WRITE_ONCE(mnt->mnt_id_unique, first_mnt_id_unique);
 +			continue;
 +		}
++		if (mnt->mnt_id_unique == mnt_parent_id)
++			continue;
++		if (!is_path_reachable(mnt, mnt->mnt.mnt_root, &orig))
++			continue;
 +		WRITE_ONCE(mnt->mnt.susfs_mnt_id_backup, READ_ONCE(mnt->mnt_id));
 +		WRITE_ONCE(mnt->mnt_id, first_mnt_id++);
 +		WRITE_ONCE(mnt->mnt_id_unique, first_mnt_id_unique++);
++		nr_mnt_ids--;
 +	}
 +
 +out_unlock_mount_hash:
