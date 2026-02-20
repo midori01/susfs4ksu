@@ -649,7 +649,7 @@ index a4ab96e8..7bec5ed4 100644
 +
  #endif
 diff --git a/kernel/setuid_hook.c b/kernel/setuid_hook.c
-index 849947c1..084bf38b 100644
+index 849947c1..0725f81b 100644
 --- a/kernel/setuid_hook.c
 +++ b/kernel/setuid_hook.c
 @@ -11,6 +11,9 @@
@@ -662,7 +662,7 @@ index 849947c1..084bf38b 100644
  
  #include "allowlist.h"
  #include "setuid_hook.h"
-@@ -19,15 +22,40 @@
+@@ -19,15 +22,37 @@
  #include "selinux/selinux.h"
  #include "seccomp_cache.h"
  #include "supercalls.h"
@@ -688,9 +688,6 @@ index 849947c1..084bf38b 100644
 +#ifdef CONFIG_KSU_SUSFS_SUS_PATH
 +extern void susfs_run_sus_path_loop(uid_t uid);
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_PATH
-+#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-+extern void susfs_reorder_mnt_id(void);
-+#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +#endif // #ifdef CONFIG_KSU_SUSFS
 +
  static void ksu_install_manager_fd_tw_func(struct callback_head *cb)
@@ -703,7 +700,7 @@ index 849947c1..084bf38b 100644
  int ksu_handle_setresuid(uid_t ruid, uid_t euid, uid_t suid)
  {
      // we rely on the fact that zygote always call setresuid(3) with same uids
-@@ -72,6 +100,79 @@ int ksu_handle_setresuid(uid_t ruid, uid_t euid, uid_t suid)
+@@ -72,6 +97,74 @@ int ksu_handle_setresuid(uid_t ruid, uid_t euid, uid_t suid)
  
      return 0;
  }
@@ -765,11 +762,6 @@ index 849947c1..084bf38b 100644
 +do_umount:
 +    // Handle kernel umount
 +    ksu_handle_umount(old_uid, new_uid);
-+
-+#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-+    // We can reorder the mnt_id now after all sus mounts are umounted
-+    susfs_reorder_mnt_id();
-+#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +
 +#ifdef CONFIG_KSU_SUSFS_SUS_PATH
 +    susfs_run_sus_path_loop(new_uid);
