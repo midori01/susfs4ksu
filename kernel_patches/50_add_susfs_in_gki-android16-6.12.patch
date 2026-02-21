@@ -710,7 +710,7 @@ index 6739e1c04..c5dec993e 100644
  			continue;
  		if (!is_path_reachable(r, r->mnt.mnt_root, &orig))
 diff --git a/fs/notify/fdinfo.c b/fs/notify/fdinfo.c
-index d2aa8985c..c2ee4d18b 100644
+index d2aa8985c..b28218808 100644
 --- a/fs/notify/fdinfo.c
 +++ b/fs/notify/fdinfo.c
 @@ -12,6 +12,9 @@
@@ -775,35 +775,35 @@ index d2aa8985c..c2ee4d18b 100644
  	if (inode) {
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +		mnt = real_mount(file->f_path.mnt);
-+		if (likely(susfs_is_current_proc_umounted()) &&
++		if (likely(susfs_is_current_proc_umounted_app()) &&
 +					mnt->mnt_id >= DEFAULT_KSU_MNT_ID)
 +		{
 +			struct path path;
 +			char *pathname = kmalloc(PAGE_SIZE, GFP_KERNEL);
 +			char *dpath;
 +			if (!pathname) {
-+				goto out_seq_printf;
++				goto orig_flow;
 +			}
 +			dpath = d_path(&file->f_path, pathname, PAGE_SIZE);
 +			if (!dpath) {
-+				goto out_free_pathname;
++				kfree(pathname);
++				goto orig_flow;
 +			}
 +			if (kern_path(dpath, 0, &path)) {
-+				goto out_free_pathname;
++				kfree(pathname);
++				goto orig_flow;
 +			}
 +			seq_printf(m, "inotify wd:%x ino:%lx sdev:%x mask:%x ignored_mask:0 ",
 +					inode_mark->wd, path.dentry->d_inode->i_ino, path.dentry->d_inode->i_sb->s_dev,
 +					inotify_mark_user_mask(mark));
 +			show_mark_fhandle(m, path.dentry->d_inode);
 +			seq_putc(m, '\n');
-+			iput(inode);
 +			path_put(&path);
 +			kfree(pathname);
++			iput(inode);
 +			return;
-+out_free_pathname:
-+			kfree(pathname);
 +		}
-+out_seq_printf:
++orig_flow:
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
  		seq_printf(m, "inotify wd:%x ino:%lx sdev:%x mask:%x ignored_mask:0 ",
  			   inode_mark->wd, inode->i_ino, inode->i_sb->s_dev,
@@ -943,7 +943,7 @@ index 87dcaae32..32b61bc9c 100644
  		seq_puts(m, saved_boot_config);
  	return 0;
 diff --git a/fs/proc/fd.c b/fs/proc/fd.c
-index 5e391cbca..1180b4fa1 100644
+index 5e391cbca..c24c48951 100644
 --- a/fs/proc/fd.c
 +++ b/fs/proc/fd.c
 @@ -15,6 +15,9 @@
@@ -972,7 +972,7 @@ index 5e391cbca..1180b4fa1 100644
  
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +	mnt = real_mount(file->f_path.mnt);
-+	if (likely(susfs_is_current_proc_umounted()) &&
++	if (likely(susfs_is_current_proc_umounted_app()) &&
 +				mnt->mnt_id >= DEFAULT_KSU_MNT_ID)
 +	{
 +		struct path path;
@@ -980,14 +980,16 @@ index 5e391cbca..1180b4fa1 100644
 +		char *dpath;
 +
 +		if (!pathname) {
-+			goto out_seq_printf;
++			goto orig_flow;
 +		}
 +		dpath = d_path(&file->f_path, pathname, PAGE_SIZE);
 +		if (!dpath) {
-+			goto out_free_pathname;
++			kfree(pathname);
++			goto orig_flow;
 +		}
 +		if (kern_path(dpath, 0, &path)) {
-+			goto out_free_pathname;
++			kfree(pathname);
++			goto orig_flow;
 +		}
 +
 +		// - We have to iterate the mnt->mnt_parent until the mnt_id is not sus,
@@ -1002,10 +1004,8 @@ index 5e391cbca..1180b4fa1 100644
 +		path_put(&path);
 +		kfree(pathname);
 +		goto bypass_orig_flow;
-+out_free_pathname:
-+		kfree(pathname);
 +	}
-+out_seq_printf:
++orig_flow:
 +	seq_printf(m, "pos:\t%lli\nflags:\t0%o\nmnt_id:\t%i\nino:\t%lu\n",
 +			(long long)file->f_pos, f_flags,
 +			mnt->mnt_id,
@@ -1641,7 +1641,7 @@ index adb071bc9..3006f6645 100644
  		      AT_STATX_SYNC_TYPE))
  		return -EINVAL;
 diff --git a/fs/statfs.c b/fs/statfs.c
-index 83c5d3feb..45efda757 100644
+index 83c5d3feb..3a20ef5ca 100644
 --- a/fs/statfs.c
 +++ b/fs/statfs.c
 @@ -9,6 +9,10 @@
@@ -1663,7 +1663,7 @@ index 83c5d3feb..45efda757 100644
 +	struct mount *mnt;
  
 +	mnt = real_mount(path->mnt);
-+	if (likely(susfs_is_current_proc_umounted())) {
++	if (likely(susfs_is_current_proc_umounted_app())) {
 +		for (; mnt->mnt_id >= DEFAULT_KSU_MNT_ID; mnt = mnt->mnt_parent) {}
 +	}
 +	error = statfs_by_dentry(mnt->mnt.mnt_root, buf);
