@@ -198,7 +198,7 @@ static inline bool is_i_uid_not_allowed(uid_t i_uid) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
 bool susfs_is_inode_sus_path(struct mnt_idmap* idmap, struct inode *inode) {
 	struct fuse_inode *fi = NULL;
-	if (current_uid().val < 10000 || !susfs_is_current_proc_umounted()) {
+	if (!susfs_is_current_proc_umounted_app()) {
 		return false;
 	}
 	if (inode->i_sb->s_magic == FUSE_SUPER_MAGIC) {
@@ -224,7 +224,7 @@ bool susfs_is_inode_sus_path(struct mnt_idmap* idmap, struct inode *inode) {
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
 bool susfs_is_inode_sus_path(struct inode *inode) {
 	struct fuse_inode *fi = NULL;
-	if (current_uid().val < 10000 || !susfs_is_current_proc_umounted()) {
+	if (!susfs_is_current_proc_umounted_app()) {
 		return false;
 	}
 	if (inode->i_sb->s_magic == FUSE_SUPER_MAGIC) {
@@ -250,7 +250,7 @@ bool susfs_is_inode_sus_path(struct inode *inode) {
 #else
 bool susfs_is_inode_sus_path(struct inode *inode) {
 	struct fuse_inode *fi = NULL;
-	if (current_uid().val < 10000 || !susfs_is_current_proc_umounted()) {
+	if (!susfs_is_current_proc_umounted_app()) {
 		return false;
 	}
 	if (inode->i_sb->s_magic == FUSE_SUPER_MAGIC) {
