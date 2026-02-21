@@ -133,7 +133,7 @@ index 9ba6e0b73..be8030379 100644
  	 * We move the actual failure in case of RLIMIT_NPROC excess from
  	 * set*uid() to execve() because too many poorly written programs
 diff --git a/fs/namei.c b/fs/namei.c
-index 1fa36df7b..fbbf26ed0 100644
+index 1fa36df7b..b3752d7cd 100644
 --- a/fs/namei.c
 +++ b/fs/namei.c
 @@ -40,10 +40,18 @@
@@ -155,7 +155,7 @@ index 1fa36df7b..fbbf26ed0 100644
  /* [Feb-1997 T. Schoebel-Theuer]
   * Fundamental changes in the pathname lookup mechanisms (namei)
   * were necessary because of omirr.  The reason is that omirr needs
-@@ -1589,15 +1597,42 @@ struct dentry *lookup_one_qstr_excl(const struct qstr *name,
+@@ -1589,15 +1597,44 @@ struct dentry *lookup_one_qstr_excl(const struct qstr *name,
  	struct dentry *dentry = lookup_dcache(name, base, flags);
  	struct dentry *old;
  	struct inode *dir = base->d_inode;
@@ -169,6 +169,8 @@ index 1fa36df7b..fbbf26ed0 100644
 +#ifdef CONFIG_KSU_SUSFS_SUS_PATH
 +	{
 +		if (!IS_ERR(dentry) && !found_sus_path && dentry->d_inode && susfs_is_inode_sus_path(dentry->d_inode)) {
++			if (d_in_lookup(dentry))
++				d_lookup_done(dentry);
 +			dput(dentry);
 +			dentry = lookup_dcache(&susfs_fake_qstr_name, base, flags);
 +			found_sus_path = true;
@@ -198,7 +200,7 @@ index 1fa36df7b..fbbf26ed0 100644
  	if (unlikely(!dentry))
  		return ERR_PTR(-ENOMEM);
  
-@@ -1614,6 +1649,9 @@ static struct dentry *lookup_fast(struct nameidata *nd)
+@@ -1614,6 +1651,9 @@ static struct dentry *lookup_fast(struct nameidata *nd)
  {
  	struct dentry *dentry, *parent = nd->path.dentry;
  	int status = 1;
@@ -208,7 +210,7 @@ index 1fa36df7b..fbbf26ed0 100644
  
  	/*
  	 * Rename seqlock is not required here because in the off chance
-@@ -1622,6 +1660,14 @@ static struct dentry *lookup_fast(struct nameidata *nd)
+@@ -1622,6 +1662,16 @@ static struct dentry *lookup_fast(struct nameidata *nd)
  	 */
  	if (nd->flags & LOOKUP_RCU) {
  		dentry = __d_lookup_rcu(parent, &nd->last, &nd->next_seq);
@@ -216,14 +218,16 @@ index 1fa36df7b..fbbf26ed0 100644
 +		if (is_nd_state_lookup_last_and_open_last && dentry && !IS_ERR(dentry) && dentry->d_inode &&
 +			susfs_is_inode_sus_path(dentry->d_inode))
 +		{
-+			dput(dentry);
++			if (d_in_lookup(dentry))
++				d_lookup_done(dentry);
++			// no dput() here, __d_lookup_rcu() does not take the dentry->d_lockref.count
 +			dentry = NULL;
 +		}
 +#endif
  		if (unlikely(!dentry)) {
  			if (!try_to_unlazy(nd))
  				return ERR_PTR(-ECHILD);
-@@ -1645,6 +1691,14 @@ static struct dentry *lookup_fast(struct nameidata *nd)
+@@ -1645,6 +1695,16 @@ static struct dentry *lookup_fast(struct nameidata *nd)
  			status = d_revalidate(dentry, nd->flags);
  	} else {
  		dentry = __d_lookup(parent, &nd->last);
@@ -231,6 +235,8 @@ index 1fa36df7b..fbbf26ed0 100644
 +		if (is_nd_state_lookup_last_and_open_last && dentry && !IS_ERR(dentry) && dentry->d_inode &&
 +			susfs_is_inode_sus_path(dentry->d_inode))
 +		{
++			if (d_in_lookup(dentry))
++				d_lookup_done(dentry);
 +			dput(dentry);
 +			dentry = NULL;
 +		}
@@ -238,7 +244,7 @@ index 1fa36df7b..fbbf26ed0 100644
  		if (unlikely(!dentry))
  			return NULL;
  		status = d_revalidate(dentry, nd->flags);
-@@ -1666,12 +1720,19 @@ static struct dentry *__lookup_slow(const struct qstr *name,
+@@ -1666,12 +1726,19 @@ static struct dentry *__lookup_slow(const struct qstr *name,
  	struct dentry *dentry, *old;
  	struct inode *inode = dir->d_inode;
  	DECLARE_WAIT_QUEUE_HEAD_ONSTACK(wq);
@@ -258,7 +264,7 @@ index 1fa36df7b..fbbf26ed0 100644
  	if (IS_ERR(dentry))
  		return dentry;
  	if (unlikely(!d_in_lookup(dentry))) {
-@@ -1680,6 +1741,12 @@ static struct dentry *__lookup_slow(const struct qstr *name,
+@@ -1680,6 +1747,12 @@ static struct dentry *__lookup_slow(const struct qstr *name,
  			if (!error) {
  				d_invalidate(dentry);
  				dput(dentry);
@@ -271,7 +277,7 @@ index 1fa36df7b..fbbf26ed0 100644
  				goto again;
  			}
  			dput(dentry);
-@@ -1693,6 +1760,17 @@ static struct dentry *__lookup_slow(const struct qstr *name,
+@@ -1693,6 +1766,18 @@ static struct dentry *__lookup_slow(const struct qstr *name,
  			dentry = old;
  		}
  	}
@@ -279,7 +285,8 @@ index 1fa36df7b..fbbf26ed0 100644
 +	if (is_nd_flags_lookup_last && !found_sus_path && dentry && !IS_ERR(dentry) && dentry->d_inode &&
 +		susfs_is_inode_sus_path(dentry->d_inode))
 +	{
-+		d_lookup_done(dentry);
++		if (d_in_lookup(dentry))
++			d_lookup_done(dentry);
 +		dput(dentry);
 +		dentry = d_alloc_parallel(dir, &susfs_fake_qstr_name, &wq);
 +		found_sus_path = true;
@@ -289,7 +296,7 @@ index 1fa36df7b..fbbf26ed0 100644
  	return dentry;
  }
  
-@@ -1994,6 +2072,11 @@ static const char *walk_component(struct nameidata *nd, int flags)
+@@ -1994,6 +2079,11 @@ static const char *walk_component(struct nameidata *nd, int flags)
  	if (IS_ERR(dentry))
  		return ERR_CAST(dentry);
  	if (unlikely(!dentry)) {
@@ -301,7 +308,7 @@ index 1fa36df7b..fbbf26ed0 100644
  		dentry = lookup_slow(&nd->last, nd->path.dentry, nd->flags);
  		if (IS_ERR(dentry))
  			return ERR_CAST(dentry);
-@@ -2257,6 +2340,9 @@ static int link_path_walk(const char *name, struct nameidata *nd)
+@@ -2257,6 +2347,9 @@ static int link_path_walk(const char *name, struct nameidata *nd)
  
  	/* At this point we know we have a real path component. */
  	for(;;) {
@@ -311,7 +318,7 @@ index 1fa36df7b..fbbf26ed0 100644
  		struct user_namespace *mnt_userns;
  		const char *link;
  		u64 hash_len;
-@@ -2267,6 +2353,14 @@ static int link_path_walk(const char *name, struct nameidata *nd)
+@@ -2267,6 +2360,14 @@ static int link_path_walk(const char *name, struct nameidata *nd)
  		if (err)
  			return err;
  
@@ -326,7 +333,7 @@ index 1fa36df7b..fbbf26ed0 100644
  		hash_len = hash_name(nd->path.dentry, name);
  
  		type = LAST_NORM;
-@@ -2450,6 +2544,9 @@ static inline const char *lookup_last(struct nameidata *nd)
+@@ -2450,6 +2551,9 @@ static inline const char *lookup_last(struct nameidata *nd)
  {
  	if (nd->last_type == LAST_NORM && nd->last.name[nd->last.len])
  		nd->flags |= LOOKUP_FOLLOW | LOOKUP_DIRECTORY;
@@ -336,7 +343,7 @@ index 1fa36df7b..fbbf26ed0 100644
  
  	return walk_component(nd, WALK_TRAILING);
  }
-@@ -3395,15 +3492,37 @@ static struct dentry *lookup_open(struct nameidata *nd, struct file *file,
+@@ -3395,15 +3499,40 @@ static struct dentry *lookup_open(struct nameidata *nd, struct file *file,
  	int error, create_error = 0;
  	umode_t mode = op->mode;
  	DECLARE_WAIT_QUEUE_HEAD_ONSTACK(wq);
@@ -354,6 +361,9 @@ index 1fa36df7b..fbbf26ed0 100644
 +	if (is_nd_state_open_last && dentry && !IS_ERR(dentry) && dentry->d_inode &&
 +		susfs_is_inode_sus_path(dentry->d_inode))
 +	{
++		if (d_in_lookup(dentry)) {
++			d_lookup_done(dentry);
++		}
 +		dput(dentry);
 +		dentry = NULL;
 +		found_sus_path = true;
@@ -374,7 +384,7 @@ index 1fa36df7b..fbbf26ed0 100644
  			if (IS_ERR(dentry))
  				return dentry;
  		}
-@@ -3502,6 +3621,9 @@ static const char *open_last_lookups(struct nameidata *nd,
+@@ -3502,6 +3631,9 @@ static const char *open_last_lookups(struct nameidata *nd,
  	bool got_write = false;
  	struct dentry *dentry;
  	const char *res;
@@ -384,7 +394,7 @@ index 1fa36df7b..fbbf26ed0 100644
  
  	nd->flags |= op->intent;
  
-@@ -3798,12 +3920,19 @@ static struct file *path_openat(struct nameidata *nd,
+@@ -3798,12 +3930,19 @@ static struct file *path_openat(struct nameidata *nd,
  	return ERR_PTR(error);
  }
  
@@ -404,7 +414,7 @@ index 1fa36df7b..fbbf26ed0 100644
  
  	set_nameidata(&nd, dfd, pathname, NULL);
  	filp = path_openat(&nd, op, flags | LOOKUP_RCU);
-@@ -3811,6 +3940,28 @@ struct file *do_filp_open(int dfd, struct filename *pathname,
+@@ -3811,6 +3950,28 @@ struct file *do_filp_open(int dfd, struct filename *pathname,
  		filp = path_openat(&nd, op, flags);
  	if (unlikely(filp == ERR_PTR(-ESTALE)))
  		filp = path_openat(&nd, op, flags | LOOKUP_REVAL);
