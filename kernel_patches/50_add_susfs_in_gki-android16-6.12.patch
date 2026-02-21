@@ -1679,22 +1679,6 @@ index 83c5d3feb..45efda757 100644
  }
  EXPORT_SYMBOL_NS(vfs_statfs, ANDROID_GKI_VFS_EXPORT_ONLY);
  
-diff --git a/include/linux/mount.h b/include/linux/mount.h
-index 788f02c9e..a9803d532 100644
---- a/include/linux/mount.h
-+++ b/include/linux/mount.h
-@@ -75,7 +75,11 @@ struct vfsmount {
- 	ANDROID_KABI_RESERVE(1);
- 	ANDROID_KABI_RESERVE(2);
- 	ANDROID_KABI_RESERVE(3);
-+#ifdef CONFIG_KSU_SUSFS
-+	ANDROID_KABI_USE(4, u64 susfs_mnt_id_backup);
-+#else
- 	ANDROID_KABI_RESERVE(4);
-+#endif
- } __randomize_layout;
- 
- static inline struct mnt_idmap *mnt_idmap(const struct vfsmount *mnt)
 diff --git a/kernel/kallsyms.c b/kernel/kallsyms.c
 index a9a0ca605..3b4b2f882 100644
 --- a/kernel/kallsyms.c
