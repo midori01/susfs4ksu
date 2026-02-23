@@ -134,7 +134,7 @@ index 71bd99ce8..2e13aa630 100644
  	 * We move the actual failure in case of RLIMIT_NPROC excess from
  	 * set*uid() to execve() because too many poorly written programs
 diff --git a/fs/namei.c b/fs/namei.c
-index b31b583f1..979565e31 100644
+index b31b583f1..94081c259 100644
 --- a/fs/namei.c
 +++ b/fs/namei.c
 @@ -41,10 +41,18 @@
@@ -382,7 +382,7 @@ index b31b583f1..979565e31 100644
  
  	nd->flags |= op->intent;
  
-@@ -3813,12 +3938,19 @@ static struct file *path_openat(struct nameidata *nd,
+@@ -3813,12 +3938,20 @@ static struct file *path_openat(struct nameidata *nd,
  	return ERR_PTR(error);
  }
  
@@ -398,33 +398,37 @@ index b31b583f1..979565e31 100644
  	struct file *filp;
 +#ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
 +	struct filename *fake_pathname;
++	struct inode *inode;
 +#endif
  
  	set_nameidata(&nd, dfd, pathname, NULL);
  	filp = path_openat(&nd, op, flags | LOOKUP_RCU);
-@@ -3826,6 +3958,28 @@ struct file *do_filp_open(int dfd, struct filename *pathname,
+@@ -3826,6 +3959,31 @@ struct file *do_filp_open(int dfd, struct filename *pathname,
  		filp = path_openat(&nd, op, flags);
  	if (unlikely(filp == ERR_PTR(-ESTALE)))
  		filp = path_openat(&nd, op, flags | LOOKUP_REVAL);
 +#ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
-+	if (!IS_ERR(filp) &&
-+		unlikely(test_bit(AS_FLAGS_OPEN_REDIRECT, &filp->f_inode->i_mapping->flags) &&
-+		current_uid().val < 2000))
-+	{
-+		fake_pathname = susfs_get_redirected_path(filp->f_inode->i_ino);
-+		if (!IS_ERR(fake_pathname)) {
-+			restore_nameidata();
-+			filp_close(filp, NULL);
-+			// no need to do `putname(pathname);` here as it will be done by calling process
-+			set_nameidata(&nd, dfd, fake_pathname, NULL);
-+			filp = path_openat(&nd, op, flags | LOOKUP_RCU);
-+			if (unlikely(filp == ERR_PTR(-ECHILD)))
-+				filp = path_openat(&nd, op, flags);
-+			if (unlikely(filp == ERR_PTR(-ESTALE)))
-+				filp = path_openat(&nd, op, flags | LOOKUP_REVAL);
-+			restore_nameidata();
-+			putname(fake_pathname);
-+			return filp;
++	if (!IS_ERR(filp)) {
++		inode = file_inode(filp);
++		if (inode->i_mapping &&
++			unlikely(test_bit(AS_FLAGS_OPEN_REDIRECT, &inode->i_mapping->flags)) &&
++			current_uid().val < 2000)
++		{
++			fake_pathname = susfs_get_redirected_path(inode->i_ino);
++			if (!IS_ERR(fake_pathname)) {
++				restore_nameidata();
++				filp_close(filp, NULL);
++				// no need to do `putname(pathname);` here as it will be done by calling process
++				set_nameidata(&nd, dfd, fake_pathname, NULL);
++				filp = path_openat(&nd, op, flags | LOOKUP_RCU);
++				if (unlikely(filp == ERR_PTR(-ECHILD)))
++					filp = path_openat(&nd, op, flags);
++				if (unlikely(filp == ERR_PTR(-ESTALE)))
++					filp = path_openat(&nd, op, flags | LOOKUP_REVAL);
++				restore_nameidata();
++				putname(fake_pathname);
++				return filp;
++			}
 +		}
 +	}
 +#endif
@@ -683,7 +687,7 @@ index 97fc42277..cd6dacb41 100644
  	if (IS_ERR(new)) {
  		namespace_unlock();
 diff --git a/fs/notify/fdinfo.c b/fs/notify/fdinfo.c
-index 1aa7de550..704fbf8b3 100644
+index 1aa7de550..cf1f6307a 100644
 --- a/fs/notify/fdinfo.c
 +++ b/fs/notify/fdinfo.c
 @@ -12,6 +12,9 @@
@@ -748,8 +752,8 @@ index 1aa7de550..704fbf8b3 100644
  	if (inode) {
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +		mnt = real_mount(file->f_path.mnt);
-+		if (likely(susfs_is_current_proc_umounted_app()) &&
-+					mnt->mnt_id >= DEFAULT_KSU_MNT_ID)
++		if (mnt->mnt_id >= DEFAULT_KSU_MNT_ID &&
++			likely(susfs_is_current_proc_umounted_app()))
 +		{
 +			struct path path;
 +			char *pathname = kmalloc(PAGE_SIZE, GFP_KERNEL);
@@ -829,7 +833,7 @@ index 0641cb3fd..38abeb748 100644
  		return -EINVAL;
  
 diff --git a/fs/proc/base.c b/fs/proc/base.c
-index 68d01c9ab..fa889e329 100644
+index 68d01c9ab..a34e299a7 100644
 --- a/fs/proc/base.c
 +++ b/fs/proc/base.c
 @@ -101,6 +101,9 @@
@@ -842,26 +846,18 @@ index 68d01c9ab..fa889e329 100644
  #include <trace/events/oom.h>
  #include <trace/hooks/sched.h>
  #include "internal.h"
-@@ -914,6 +917,9 @@ static ssize_t mem_rw(struct file *file, char __user *buf,
- 	ssize_t copied;
- 	char *page;
- 	unsigned int flags;
-+#ifdef CONFIG_KSU_SUSFS_SUS_MAP
-+	struct vm_area_struct *vma;
-+#endif
- 
- 	if (!mm)
- 		return 0;
-@@ -932,6 +938,24 @@ static ssize_t mem_rw(struct file *file, char __user *buf,
+@@ -932,6 +935,26 @@ static ssize_t mem_rw(struct file *file, char __user *buf,
  
  	while (count > 0) {
  		size_t this_len = min_t(size_t, count, PAGE_SIZE);
 +#ifdef CONFIG_KSU_SUSFS_SUS_MAP
++		struct vm_area_struct *vma;
 +		vma = find_vma(mm, addr);
 +		if (vma && vma->vm_file) {
 +			struct inode *inode = file_inode(vma->vm_file);
-+			if (unlikely(test_bit(AS_FLAGS_SUS_MAP, &inode->i_mapping->flags) &&
-+				susfs_is_current_proc_umounted()))
++			if (inode->i_mapping &&
++				unlikely(test_bit(AS_FLAGS_SUS_MAP, &inode->i_mapping->flags) &&
++				susfs_is_current_proc_umounted_app()))
 +			{
 +				if (write) {
 +					copied = -EFAULT;
@@ -877,16 +873,26 @@ index 68d01c9ab..fa889e329 100644
  
  		if (write && copy_from_user(page, buf, this_len)) {
  			copied = -EFAULT;
-@@ -2466,6 +2490,13 @@ proc_map_files_readdir(struct file *file, struct dir_context *ctx)
+@@ -2423,6 +2446,9 @@ proc_map_files_readdir(struct file *file, struct dir_context *ctx)
+ 	struct map_files_info *p;
+ 	int ret;
+ 	struct vma_iterator vmi;
++#ifdef CONFIG_KSU_SUSFS_SUS_MAP
++	struct inode *inode;
++#endif
+ 
+ 	genradix_init(&fa);
+ 
+@@ -2466,6 +2492,13 @@ proc_map_files_readdir(struct file *file, struct dir_context *ctx)
  	for_each_vma(vmi, vma) {
  		if (!vma->vm_file)
  			continue;
 +#ifdef CONFIG_KSU_SUSFS_SUS_MAP
-+		if (unlikely(test_bit(AS_FLAGS_SUS_MAP, &file_inode(vma->vm_file)->i_mapping->flags) &&
-+			susfs_is_current_proc_umounted()))
-+		{
++		inode = file_inode(vma->vm_file);
++		if (inode->i_mapping &&
++			unlikely(test_bit(AS_FLAGS_SUS_MAP, &inode->i_mapping->flags) &&
++			susfs_is_current_proc_umounted_app()))
 +			continue;
-+		}
 +#endif
  		if (++pos <= ctx->pos)
  			continue;
@@ -916,7 +922,7 @@ index 2e244ada1..792e1cb04 100644
  		seq_puts(m, saved_boot_config);
  	return 0;
 diff --git a/fs/proc/fd.c b/fs/proc/fd.c
-index 4297287f6..2eda33733 100644
+index 4297287f6..ef02984c9 100644
 --- a/fs/proc/fd.c
 +++ b/fs/proc/fd.c
 @@ -15,6 +15,9 @@
@@ -945,8 +951,8 @@ index 4297287f6..2eda33733 100644
  
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +	mnt = real_mount(file->f_path.mnt);
-+	if (likely(susfs_is_current_proc_umounted_app()) &&
-+				mnt->mnt_id >= DEFAULT_KSU_MNT_ID)
++	if (mnt->mnt_id >= DEFAULT_KSU_MNT_ID &&
++		likely(susfs_is_current_proc_umounted_app()))
 +	{
 +		struct path path;
 +		char *pathname = kmalloc(PAGE_SIZE, GFP_KERNEL);
@@ -994,7 +1000,7 @@ index 4297287f6..2eda33733 100644
  	/* show_fd_locks() never deferences files so a stale value is safe */
  	show_fd_locks(m, file, files);
 diff --git a/fs/proc/task_mmu.c b/fs/proc/task_mmu.c
-index e4380b37f..67dc65e83 100644
+index e4380b37f..2de22bf75 100644
 --- a/fs/proc/task_mmu.c
 +++ b/fs/proc/task_mmu.c
 @@ -23,6 +23,9 @@
@@ -1018,13 +1024,14 @@ index e4380b37f..67dc65e83 100644
  static void
  show_map_vma(struct seq_file *m, struct vm_area_struct *vma)
  {
-@@ -275,8 +282,38 @@ show_map_vma(struct seq_file *m, struct vm_area_struct *vma)
+@@ -275,8 +282,41 @@ show_map_vma(struct seq_file *m, struct vm_area_struct *vma)
  
  	if (file) {
  		struct inode *inode = file_inode(vma->vm_file);
 +#ifdef CONFIG_KSU_SUSFS_SUS_MAP
-+		if (unlikely(test_bit(AS_FLAGS_SUS_MAP, &inode->i_mapping->flags) &&
-+			susfs_is_current_proc_umounted()))
++		if (inode->i_mapping &&
++			unlikely(test_bit(AS_FLAGS_SUS_MAP, &inode->i_mapping->flags) &&
++			susfs_is_current_proc_umounted_app()))
 +		{
 +			seq_setwidth(m, 25 + sizeof(void *) * 6 - 1);
 +			seq_put_hex_ll(m, NULL, vma->vm_start, 8);
@@ -1039,12 +1046,14 @@ index e4380b37f..67dc65e83 100644
 +			seq_put_hex_ll(m, ":", MINOR(dev), 2);
 +			seq_put_decimal_ull(m, " ", ino);
 +			seq_putc(m, ' ');
-+			seq_putc(m, '\n');
-+			return;
++			goto done;
 +		}
 +#endif
 +#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
-+		if (unlikely(test_bit(AS_FLAGS_SUS_KSTAT, &inode->i_mapping->flags))) {
++		if (inode->i_mapping &&
++			unlikely(test_bit(AS_FLAGS_SUS_KSTAT, &inode->i_mapping->flags) &&
++			susfs_is_current_proc_umounted_app()))
++		{
 +			susfs_sus_ino_for_show_map_vma(inode->i_ino, &dev, &ino);
 +			goto bypass_orig_flow;
 +		}
@@ -1057,44 +1066,50 @@ index e4380b37f..67dc65e83 100644
  		pgoff = ((loff_t)vma->vm_pgoff) << PAGE_SHIFT;
  	}
  
-@@ -897,6 +934,26 @@ static int show_smap(struct seq_file *m, void *v)
+@@ -897,6 +937,29 @@ static int show_smap(struct seq_file *m, void *v)
  	if (!vma_pages(vma))
  		goto show_pad;
  
 +#ifdef CONFIG_KSU_SUSFS_SUS_MAP
-+	if (vma->vm_file &&
-+		unlikely(test_bit(AS_FLAGS_SUS_MAP, &file_inode(vma->vm_file)->i_mapping->flags) &&
-+		susfs_is_current_proc_umounted()))
-+	{
-+		show_map_vma(m, vma);
-+		SEQ_PUT_DEC("Size:           ", vma->vm_end - vma->vm_start);
-+		SEQ_PUT_DEC(" kB\nKernelPageSize: ", vma_kernel_pagesize(vma));
-+		SEQ_PUT_DEC(" kB\nMMUPageSize:    ", vma_mmu_pagesize(vma));
-+		seq_puts(m, " kB\n");
-+		__show_smap(m, &mss, false);
-+		seq_printf(m, "THPeligible:    %d\n", 0);
-+		if (arch_pkeys_enabled())
-+				seq_printf(m, "ProtectionKey:  %8u\n", vma_pkey(vma));
-+		seq_puts(m, "VmFlags: mr mw me");
-+		seq_putc(m, '\n');
-+		goto show_pad;
++	if (vma->vm_file) {
++		struct inode *inode = file_inode(vma->vm_file);
++		if (inode->i_mapping &&
++			unlikely(test_bit(AS_FLAGS_SUS_MAP, &inode->i_mapping->flags) &&
++			susfs_is_current_proc_umounted_app()))
++		{
++			show_map_vma(m, vma);
++			SEQ_PUT_DEC("Size:           ", vma->vm_end - vma->vm_start);
++			SEQ_PUT_DEC(" kB\nKernelPageSize: ", vma_kernel_pagesize(vma));
++			SEQ_PUT_DEC(" kB\nMMUPageSize:    ", vma_mmu_pagesize(vma));
++			seq_puts(m, " kB\n");
++			__show_smap(m, &mss, false);
++			seq_printf(m, "THPeligible:    %d\n", 0);
++			if (arch_pkeys_enabled())
++					seq_printf(m, "ProtectionKey:  %8u\n", vma_pkey(vma));
++			seq_puts(m, "VmFlags: mr mw me");
++			seq_putc(m, '\n');
++			goto show_pad;
++		}
 +	}
 +#endif
 +
  	smap_gather_stats(vma, &mss, 0);
  
  	show_map_vma(m, vma);
-@@ -955,7 +1012,20 @@ static int show_smaps_rollup(struct seq_file *m, void *v)
+@@ -955,7 +1018,23 @@ static int show_smaps_rollup(struct seq_file *m, void *v)
  
  	vma_start = vma->vm_start;
  	do {
 +#ifdef CONFIG_KSU_SUSFS_SUS_MAP
-+		if (vma->vm_file &&
-+			unlikely(test_bit(AS_FLAGS_SUS_MAP, &file_inode(vma->vm_file)->i_mapping->flags) &&
-+			susfs_is_current_proc_umounted()))
-+		{
-+			memset(&mss, 0, sizeof(mss));
-+			goto bypass_orig_flow;
++		if (vma->vm_file) {
++			struct inode *inode = file_inode(vma->vm_file);
++			if (inode->i_mapping &&
++				unlikely(test_bit(AS_FLAGS_SUS_MAP, &inode->i_mapping->flags) &&
++				susfs_is_current_proc_umounted_app()))
++			{
++				memset(&mss, 0, sizeof(mss));
++				goto bypass_orig_flow;
++			}
 +		}
 +#endif
 +
@@ -1105,7 +1120,7 @@ index e4380b37f..67dc65e83 100644
  		last_vma_end = vma->vm_end;
  
  		/*
-@@ -1735,6 +1805,9 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
+@@ -1735,6 +1814,9 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
  	int ret = 0, copied = 0;
  	unsigned int nr_subpages = __PAGE_SIZE / PAGE_SIZE;
  	pagemap_entry_t *res = NULL;
@@ -1115,7 +1130,7 @@ index e4380b37f..67dc65e83 100644
  
  	if (!mm || !mmget_not_zero(mm))
  		goto out;
-@@ -1810,6 +1883,17 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
+@@ -1810,6 +1892,18 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
  		if (ret)
  			goto out_free;
  		ret = walk_page_range(mm, start_vaddr, end, &pagemap_ops, &pm);
@@ -1123,8 +1138,9 @@ index e4380b37f..67dc65e83 100644
 +		vma = find_vma(mm, start_vaddr);
 +		if (vma && vma->vm_file) {
 +			struct inode *inode = file_inode(vma->vm_file);
-+			if (unlikely(test_bit(AS_FLAGS_SUS_MAP, &inode->i_mapping->flags) &&
-+				susfs_is_current_proc_umounted()))
++			if (inode->i_mapping &&
++				unlikely(test_bit(AS_FLAGS_SUS_MAP, &inode->i_mapping->flags) &&
++				susfs_is_current_proc_umounted_app()))
 +			{
 +				pm.buffer->pme = 0;
 +			}
@@ -1507,7 +1523,7 @@ index c8c46e294..a18bb8379 100644
  	if (error >= 0)
  		error = buf.error;
 diff --git a/fs/stat.c b/fs/stat.c
-index 517fa4ed8..02ed353d0 100644
+index 517fa4ed8..225ac12b5 100644
 --- a/fs/stat.c
 +++ b/fs/stat.c
 @@ -20,12 +20,20 @@
@@ -1531,13 +1547,14 @@ index 517fa4ed8..02ed353d0 100644
  /**
   * generic_fillattr - Fill in the basic attributes from the inode struct
   * @idmap:		idmap of the mount the inode was found from
-@@ -49,6 +57,19 @@ void generic_fillattr(struct mnt_idmap *idmap, u32 request_mask,
+@@ -49,6 +57,20 @@ void generic_fillattr(struct mnt_idmap *idmap, u32 request_mask,
  	vfsuid_t vfsuid = i_uid_into_vfsuid(idmap, inode);
  	vfsgid_t vfsgid = i_gid_into_vfsgid(idmap, inode);
  
 +#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
-+	if (unlikely(test_bit(AS_FLAGS_SUS_KSTAT, &inode->i_mapping->flags)) &&
-+		likely(susfs_is_current_proc_umounted()))
++	if (inode->i_mapping &&
++		unlikely(test_bit(AS_FLAGS_SUS_KSTAT, &inode->i_mapping->flags)) &&
++		likely(susfs_is_current_proc_umounted_app()))
 +	{
 +		susfs_sus_ino_for_generic_fillattr(inode->i_ino, stat);
 +		stat->mode = inode->i_mode;
@@ -1551,7 +1568,7 @@ index 517fa4ed8..02ed353d0 100644
  	stat->dev = inode->i_sb->s_dev;
  	stat->ino = inode->i_ino;
  	stat->mode = inode->i_mode;
-@@ -187,6 +208,12 @@ EXPORT_SYMBOL_NS(vfs_getattr, ANDROID_GKI_VFS_EXPORT_ONLY);
+@@ -187,6 +209,12 @@ EXPORT_SYMBOL_NS(vfs_getattr, ANDROID_GKI_VFS_EXPORT_ONLY);
   *
   * 0 will be returned on success, and a -ve error code if unsuccessful.
   */
@@ -1564,7 +1581,7 @@ index 517fa4ed8..02ed353d0 100644
  int vfs_fstat(int fd, struct kstat *stat)
  {
  	struct fd f;
-@@ -196,6 +223,11 @@ int vfs_fstat(int fd, struct kstat *stat)
+@@ -196,6 +224,11 @@ int vfs_fstat(int fd, struct kstat *stat)
  	if (!f.file)
  		return -EBADF;
  	error = vfs_getattr(&f.file->f_path, stat, STATX_BASIC_STATS, 0);
@@ -1576,7 +1593,7 @@ index 517fa4ed8..02ed353d0 100644
  	fdput(f);
  	return error;
  }
-@@ -214,6 +246,16 @@ int getname_statx_lookup_flags(int flags)
+@@ -214,6 +247,16 @@ int getname_statx_lookup_flags(int flags)
  	return lookup_flags;
  }
  
@@ -1593,7 +1610,7 @@ index 517fa4ed8..02ed353d0 100644
  /**
   * vfs_statx - Get basic and extra attributes by filename
   * @dfd: A file descriptor representing the base dir for a relative filename
-@@ -236,6 +278,19 @@ static int vfs_statx(int dfd, struct filename *filename, int flags,
+@@ -236,6 +279,19 @@ static int vfs_statx(int dfd, struct filename *filename, int flags,
  	unsigned int lookup_flags = getname_statx_lookup_flags(flags);
  	int error;
  
