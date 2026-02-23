@@ -5,7 +5,7 @@ This branch is exclusive for pixel8 (Shiba) only, it is based on latest sultan u
 
 - Official KernelSU: https://github.com/tiann/KernelSU
 
-- Based on Factory Images with Security Patch 2026-01-05
+- Based on Factory Images with Security Patch 2026-02-05
 
 ## Requirements ##
 - Full Stock Factory Pixel 8 (Shiba) images
@@ -42,8 +42,10 @@ This branch is exclusive for pixel8 (Shiba) only, it is based on latest sultan u
 5. Run `cp ./kernel_patches/include/linux/* $KERNEL_REPO/include/linux/`
 6. Run `cd $KERNEL_REPO/KernelSU` and then `patch -p1 < 10_enable_susfs_for_ksu.patch`
 7. Run `cd $KERNEL_REPO` and then `patch -p1 < 50_add_susfs_in_kernel.patch`, **if there are failed patches, you may try to patch them manually by yourself.**
-8. If you want to make your kernel support other KSU manager variant, you can add its own hash size and hash in `ksu_is_manager_apk()` function in `KernelSU/kernel/apk_sign.c`
-9. Make sure again to have `CONFIG_KSU` and `CONFIG_KSU_SUSFS` enabled before building the kernel, some other SUSFS feature may be disabled by default, you may enable/disable them via `menuconfig`, `kernel defconfig`, or change the `default [y|n]` option under each `config KSU_SUSFS_` option in `$KernelSU_repo/kernel/Kconfig` if you build with a new defconfig every time.
+8. (Optional) Apply 60_scripts_mkcompile_h.patch, 61_scripts_setlocalversion.patch, 62_init_Makefile.patch for a hardcoded build strings and kernel version strings, with this you do not need to enable uname spoof.
+9. (Optional) Apply 70_zuma_defconfig.patch for my personal defconfig with some other drivers enabled.
+10. If you want to make your kernel support other KSU manager variant, you can add its own hash size and hash in `ksu_is_manager_apk()` function in `KernelSU/kernel/apk_sign.c`
+11. Make sure again to have `CONFIG_KSU` and `CONFIG_KSU_SUSFS` enabled before building the kernel, some other SUSFS feature may be disabled by default, you may enable/disable them via `menuconfig`, `kernel defconfig`, or change the `default [y|n]` option under each `config KSU_SUSFS_` option in `$KernelSU_repo/kernel/Kconfig` if you build with a new defconfig every time.
 
 ## Prebuilt AnyKernel3 Zip ##
 - My prebuilt anykernel3 zip is provided if users just want to use it directly, but again be reminded to back up your own data first as always.

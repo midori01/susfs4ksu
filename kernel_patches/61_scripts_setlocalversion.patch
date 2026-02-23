@@ -1,0 +1,11 @@
+diff --git a/scripts/setlocalversion b/scripts/setlocalversion
+index 1b733ae4c..1db2d4e47 100755
+--- a/scripts/setlocalversion
++++ b/scripts/setlocalversion
+@@ -170,4 +170,5 @@ if test -n "${BUILD_NUMBER}"; then
+ 	res="$res-ab${BUILD_NUMBER}"
+ fi
+ 
+-echo "$res"
++#echo "$res"
++echo "-android14-11-gc1de4747ac59-ab14219743"

@@ -1,11 +1,15 @@
 diff --git a/scripts/mkcompile_h b/scripts/mkcompile_h
-index 2596f78e5..cb3acc9a3 100755
+index 2596f78e5..dcc5e4bca 100755
 --- a/scripts/mkcompile_h
 +++ b/scripts/mkcompile_h
-@@ -23,5 +23,5 @@ cat <<EOF
+@@ -21,7 +21,7 @@ LD_VERSION=$(LC_ALL=C $LD -v | head -n1 |
+ 
+ cat <<EOF
  #define UTS_MACHINE		"${UTS_MACHINE}"
- #define LINUX_COMPILE_BY	"${LINUX_COMPILE_BY}"
- #define LINUX_COMPILE_HOST	"${LINUX_COMPILE_HOST}"
+-#define LINUX_COMPILE_BY	"${LINUX_COMPILE_BY}"
+-#define LINUX_COMPILE_HOST	"${LINUX_COMPILE_HOST}"
 -#define LINUX_COMPILER		"${CC_VERSION}, ${LD_VERSION}"
++#define LINUX_COMPILE_BY	"build-user"
++#define LINUX_COMPILE_HOST	"build-host"
 +#define LINUX_COMPILER		"Android (10087095, +pgo, +bolt, +lto, -mlgo, based on r487747c) clang version 17.0.2 (https://android.googlesource.com/toolchain/llvm-project d9f89f4d16663d5012e5c09495f3b30ece3d2362), LLD 17.0.2"
  EOF
