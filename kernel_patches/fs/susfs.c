@@ -881,7 +881,7 @@ out_copy_to_user:
 #define SDCARD_ANDROID_PATH "/data/media/0/Android"
 extern void setup_selinux(const char *domain, struct cred *cred);
 extern bool susfs_is_current_ksu_domain(void);
-bool susfs_is_sdcard_android_data_decrypted __read_mostly = true;
+bool susfs_is_sdcard_android_data_decrypted __read_mostly = false;
 
 struct watch_dir {
 	const char *path;
