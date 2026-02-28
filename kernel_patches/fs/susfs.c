@@ -255,7 +255,6 @@ bool susfs_is_inode_sus_path(struct inode *inode)
 #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 // - Default to false now so zygisk can pick up the sus mounts without the need to turn it off manually in post-fs-data stage
 //   otherwise user needs to turn it on in post-fs-data stage and turn it off in boot-completed stage
-DECLARE_RWSEM(susfs_hide_sus_mnts_for_non_su_procs_sem);
 bool susfs_hide_sus_mnts_for_non_su_procs = false;
 
 void susfs_set_hide_sus_mnts_for_non_su_procs(void __user **user_info) {
@@ -265,10 +264,8 @@ void susfs_set_hide_sus_mnts_for_non_su_procs(void __user **user_info) {
 		info.err = -EFAULT;
 		goto out_copy_to_user;
 	}
-
-	down_write(&susfs_hide_sus_mnts_for_non_su_procs_sem);
-	susfs_hide_sus_mnts_for_non_su_procs = info.enabled;
-	up_write(&susfs_hide_sus_mnts_for_non_su_procs_sem);
+	
+	WRITE_ONCE(susfs_hide_sus_mnts_for_non_su_procs, info.enabled);
 	SUSFS_LOGI("susfs_hide_sus_mnts_for_non_su_procs: %d\n", info.enabled);
 	info.err = 0;
 out_copy_to_user:
