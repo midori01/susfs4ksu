@@ -1178,7 +1178,7 @@ index 7cd33b742..9fbd03af7 100644
  		start_vaddr = end;
  
 diff --git a/fs/proc_namespace.c b/fs/proc_namespace.c
-index e133b507d..542bf8b45 100644
+index e133b507d..2cfd1df59 100644
 --- a/fs/proc_namespace.c
 +++ b/fs/proc_namespace.c
 @@ -12,12 +12,20 @@
@@ -1207,7 +1207,7 @@ index e133b507d..542bf8b45 100644
  	int err;
  
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-+	if (susfs_hide_sus_mnts_for_non_su_procs &&
++	if (READ_ONCE(susfs_hide_sus_mnts_for_non_su_procs) &&
 +		r->mnt_id >= DEFAULT_KSU_MNT_ID &&
 +		!susfs_is_current_ksu_domain())
 +	{
@@ -1223,7 +1223,7 @@ index e133b507d..542bf8b45 100644
  	int err;
  
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-+	if (susfs_hide_sus_mnts_for_non_su_procs &&
++	if (READ_ONCE(susfs_hide_sus_mnts_for_non_su_procs) &&
 +		r->mnt_id >= DEFAULT_KSU_MNT_ID &&
 +		!susfs_is_current_ksu_domain())
 +	{
@@ -1239,7 +1239,7 @@ index e133b507d..542bf8b45 100644
  	int err;
  
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-+	if (susfs_hide_sus_mnts_for_non_su_procs &&
++	if (READ_ONCE(susfs_hide_sus_mnts_for_non_su_procs) &&
 +		r->mnt_id >= DEFAULT_KSU_MNT_ID &&
 +		!susfs_is_current_ksu_domain())
 +	{
@@ -1824,7 +1824,7 @@ index 1a154c425..cc55ff699 100644
  	if (copy_to_user(name, &tmp, sizeof(tmp)))
  		return -EFAULT;
 diff --git a/security/selinux/avc.c b/security/selinux/avc.c
-index 29a9bf854..b7eb0fa7a 100644
+index 29a9bf854..5614dced7 100644
 --- a/security/selinux/avc.c
 +++ b/security/selinux/avc.c
 @@ -47,6 +47,12 @@
@@ -1845,7 +1845,7 @@ index 29a9bf854..b7eb0fa7a 100644
  	rc = security_sid_to_context(sad->tsid, &tcontext,
  				     &tcontext_len);
 +#ifdef CONFIG_KSU_SUSFS
-+	if (unlikely(sad->tsid == susfs_ksu_sid && susfs_is_avc_log_spoofing_enabled)) {
++	if (unlikely(sad->tsid == susfs_ksu_sid && READ_ONCE(susfs_is_avc_log_spoofing_enabled))) {
 +		if (rc)
 +			audit_log_format(ab, " tsid=%d", susfs_priv_app_sid);
 +		else
