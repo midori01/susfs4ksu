@@ -436,10 +436,10 @@ index bdc243fc4..8c53465ea 100644
  	return filp;
  }
 diff --git a/fs/namespace.c b/fs/namespace.c
-index 6739e1c04..c5dec993e 100644
+index 6739e1c04..b944f1cb0 100644
 --- a/fs/namespace.c
 +++ b/fs/namespace.c
-@@ -33,11 +33,22 @@
+@@ -33,11 +33,21 @@
  #include <linux/shmem_fs.h>
  #include <linux/mnt_idmapping.h>
  #include <linux/nospec.h>
@@ -453,7 +453,6 @@ index 6739e1c04..c5dec993e 100644
  
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +extern bool susfs_is_current_ksu_domain(void);
-+extern bool susfs_is_current_zygote_domain(void);
 +extern bool susfs_is_sdcard_android_data_decrypted __read_mostly;
 +
 +#define CL_COPY_MNT_NS BIT(25) /* used by copy_mnt_ns() */
@@ -462,7 +461,7 @@ index 6739e1c04..c5dec993e 100644
  /* Maximum number of mounts in a mount namespace */
  static unsigned int sysctl_mount_max __read_mostly = 100000;
  
-@@ -265,7 +276,25 @@ static void mnt_free_id(struct mount *mnt)
+@@ -265,7 +275,25 @@ static void mnt_free_id(struct mount *mnt)
   */
  static int mnt_alloc_group_id(struct mount *mnt)
  {
@@ -488,7 +487,7 @@ index 6739e1c04..c5dec993e 100644
  
  	if (res < 0)
  		return res;
-@@ -315,6 +344,130 @@ int mnt_get_count(struct mount *mnt)
+@@ -315,6 +343,130 @@ int mnt_get_count(struct mount *mnt)
  #endif
  }
  
@@ -568,7 +567,7 @@ index 6739e1c04..c5dec993e 100644
 +			goto out_free_cache;
 +		}
 +		mnt->mnt_id = res;
-+		mnt->mnt_id_unique = atomic64_read(&mnt_id_ctr);
++		mnt->mnt_id_unique = atomic64_inc_return(&mnt_id_ctr);
 +
 +		if (name) {
 +			mnt->mnt_devname = kstrdup_const(name,
@@ -619,7 +618,7 @@ index 6739e1c04..c5dec993e 100644
  static struct mount *alloc_vfsmnt(const char *name)
  {
  	struct mount *mnt = kmem_cache_zalloc(mnt_cache, GFP_KERNEL);
-@@ -1212,7 +1365,19 @@ struct vfsmount *vfs_create_mount(struct fs_context *fc)
+@@ -1212,7 +1364,19 @@ struct vfsmount *vfs_create_mount(struct fs_context *fc)
  	if (!fc->root)
  		return ERR_PTR(-EINVAL);
  
@@ -639,7 +638,7 @@ index 6739e1c04..c5dec993e 100644
  	if (!mnt)
  		return ERR_PTR(-ENOMEM);
  
-@@ -1295,7 +1460,39 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
+@@ -1295,7 +1459,39 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
  	struct mount *mnt;
  	int err;
  
@@ -679,7 +678,7 @@ index 6739e1c04..c5dec993e 100644
  	if (!mnt)
  		return ERR_PTR(-ENOMEM);
  
-@@ -1557,6 +1754,11 @@ static struct mount *mnt_find_id_at(struct mnt_namespace *ns, u64 mnt_id)
+@@ -1557,6 +1753,11 @@ static struct mount *mnt_find_id_at(struct mnt_namespace *ns, u64 mnt_id)
  			node = node->rb_right;
  		}
  	}
@@ -691,7 +690,7 @@ index 6739e1c04..c5dec993e 100644
  	return ret;
  }
  
-@@ -3990,6 +4192,9 @@ struct mnt_namespace *copy_mnt_ns(unsigned long flags, struct mnt_namespace *ns,
+@@ -3990,6 +4191,9 @@ struct mnt_namespace *copy_mnt_ns(unsigned long flags, struct mnt_namespace *ns,
  	copy_flags = CL_COPY_UNBINDABLE | CL_EXPIRE;
  	if (user_ns != ns->user_ns)
  		copy_flags |= CL_SHARED_TO_SLAVE;
@@ -701,7 +700,7 @@ index 6739e1c04..c5dec993e 100644
  	new = copy_tree(old, old->mnt.mnt_root, copy_flags);
  	if (IS_ERR(new)) {
  		namespace_unlock();
-@@ -5481,6 +5686,11 @@ static ssize_t do_listmount(struct klistmount *kls, bool reverse)
+@@ -5481,6 +5685,11 @@ static ssize_t do_listmount(struct klistmount *kls, bool reverse)
  	}
  
  	for (ret = 0, r = first; r && nr_mnt_ids; r = listmnt_next(r, reverse)) {
