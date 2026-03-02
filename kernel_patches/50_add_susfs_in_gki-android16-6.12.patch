@@ -436,7 +436,7 @@ index bdc243fc4..8c53465ea 100644
  	return filp;
  }
 diff --git a/fs/namespace.c b/fs/namespace.c
-index 6739e1c04..837976c83 100644
+index 6739e1c04..5d7b91064 100644
 --- a/fs/namespace.c
 +++ b/fs/namespace.c
 @@ -33,11 +33,25 @@
@@ -762,6 +762,21 @@ index 6739e1c04..837976c83 100644
  		*mnt_ids = r->mnt_id_unique;
  		mnt_ids++;
  		nr_mnt_ids--;
+@@ -5911,3 +6148,13 @@ static int __init init_fs_namespace_sysctls(void)
+ fs_initcall(init_fs_namespace_sysctls);
+ 
+ #endif /* CONFIG_SYSCTL */
++
++#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
++struct vfsmount *susfs_get_non_sus_vfsmnt_from_vfsmnt(struct vfsmount *vfsmnt) {
++	struct mount *mnt = real_mount(vfsmnt);
++
++	for (; mnt && mnt->mnt_parent && mnt != mnt->mnt_parent && mnt->mnt_id >= DEFAULT_KSU_MNT_ID; mnt = mnt->mnt_parent) { }
++
++	return &mnt->mnt;
++}
++#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+\ No newline at end of file
 diff --git a/fs/notify/fdinfo.c b/fs/notify/fdinfo.c
 index d2aa8985c..ad8b5f980 100644
 --- a/fs/notify/fdinfo.c
@@ -1716,6 +1731,65 @@ index adb071bc9..bd2501eb3 100644
  	if (flags & ~(AT_SYMLINK_NOFOLLOW | AT_NO_AUTOMOUNT | AT_EMPTY_PATH |
  		      AT_STATX_SYNC_TYPE))
  		return -EINVAL;
+diff --git a/fs/statfs.c b/fs/statfs.c
+index 83c5d3feb..3aef6fc09 100644
+--- a/fs/statfs.c
++++ b/fs/statfs.c
+@@ -9,6 +9,10 @@
+ #include <linux/security.h>
+ #include <linux/uaccess.h>
+ #include <linux/compat.h>
++#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
++#include <linux/susfs_def.h>
++#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
++
+ #include "internal.h"
+ 
+ static int flags_by_mnt(int mnt_flags)
+@@ -83,14 +87,42 @@ int vfs_get_fsid(struct dentry *dentry, __kernel_fsid_t *fsid)
+ }
+ EXPORT_SYMBOL(vfs_get_fsid);
+ 
++#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
++extern struct vfsmount *susfs_get_non_sus_vfsmnt_from_vfsmnt(struct vfsmount *vfsmnt);
++#endif //#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
++
+ int vfs_statfs(const struct path *path, struct kstatfs *buf)
+ {
+ 	int error;
+-
++#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
++	struct vfsmount *no_sus_vfsmnt = NULL;
++
++	if (likely(susfs_is_current_proc_umounted() && path->mnt)) {
++		no_sus_vfsmnt = susfs_get_non_sus_vfsmnt_from_vfsmnt(path->mnt);
++		mntget(no_sus_vfsmnt);
++		if (!no_sus_vfsmnt->mnt_root || IS_ERR(no_sus_vfsmnt->mnt_root)) {
++			mntput(no_sus_vfsmnt);
++			goto orig_flow;
++		}
++		dget(no_sus_vfsmnt->mnt_root);
++		error = statfs_by_dentry(no_sus_vfsmnt->mnt_root, buf);
++		if (!error)
++			buf->f_flags = calculate_f_flags(no_sus_vfsmnt);
++		dput(no_sus_vfsmnt->mnt_root);
++		mntput(no_sus_vfsmnt);
++		return error;
++	}
++orig_flow:
++	error = statfs_by_dentry(path->dentry, buf);
++	if (!error)
++		buf->f_flags = calculate_f_flags(path->mnt);
++	return error;
++#else
+ 	error = statfs_by_dentry(path->dentry, buf);
+ 	if (!error)
+ 		buf->f_flags = calculate_f_flags(path->mnt);
+ 	return error;
++#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+ }
+ EXPORT_SYMBOL_NS(vfs_statfs, ANDROID_GKI_VFS_EXPORT_ONLY);
+ 
 diff --git a/kernel/kallsyms.c b/kernel/kallsyms.c
 index a9a0ca605..3b4b2f882 100644
 --- a/kernel/kallsyms.c
