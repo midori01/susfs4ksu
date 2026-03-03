@@ -448,7 +448,7 @@ index 1fa36df7b..bcdc4d38f 100644
  	return filp;
  }
 diff --git a/fs/namespace.c b/fs/namespace.c
-index 67d89ebb5..8afdf8ad0 100644
+index 67d89ebb5..3920af491 100644
 --- a/fs/namespace.c
 +++ b/fs/namespace.c
 @@ -32,10 +32,24 @@
@@ -490,7 +490,7 @@ index 67d89ebb5..8afdf8ad0 100644
 +		return;
 +	}
 +
-+#endif
++#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
  	ida_free(&mnt_id_ida, mnt->mnt_id);
  }
  
@@ -530,7 +530,7 @@ index 67d89ebb5..8afdf8ad0 100644
 +		mnt->mnt_group_id = 0;
 +		return;
 +	}
-+#endif
++#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
  	ida_free(&mnt_group_ida, mnt->mnt_group_id);
  	mnt->mnt_group_id = 0;
  }
@@ -728,7 +728,7 @@ index 67d89ebb5..8afdf8ad0 100644
 +	if (unlikely(is_mnt_ksu_unshared)) {
 +		mnt->mnt.mnt_flags |= VFSMOUNT_MNT_FLAGS_KSU_UNSHARED_MNT;
 +	}
-+#endif
++#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +
  	atomic_inc(&sb->s_active);
  	mnt->mnt.mnt_userns = mnt_user_ns(&old->mnt);
@@ -743,6 +743,40 @@ index 67d89ebb5..8afdf8ad0 100644
  	new = copy_tree(old, old->mnt.mnt_root, copy_flags);
  	if (IS_ERR(new)) {
  		namespace_unlock();
+@@ -4742,3 +4963,32 @@ static int __init init_fs_namespace_sysctls(void)
+ fs_initcall(init_fs_namespace_sysctls);
+ 
+ #endif /* CONFIG_SYSCTL */
++
++#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
++/* - To retrieve the non sus mount from mount, takes no any references */
++struct mount *susfs_get_non_sus_mnt_from_mnt(struct mount *orig_mnt) {
++	struct mount *mnt = orig_mnt;
++
++	lock_mount_hash();
++	for (; mnt && mnt->mnt_parent && mnt != mnt->mnt_parent && mnt->mnt_id >= DEFAULT_KSU_MNT_ID; mnt = mnt->mnt_parent) { }
++	unlock_mount_hash();
++	return mnt;
++}
++
++/* - To retrieve the non sus vfsmount from vfsmount, takes a reference on &mnt->mnt and mnt->mnt.mnt_root */
++struct vfsmount *susfs_get_non_sus_vfsmnt_from_vfsmnt(struct vfsmount *vfsmnt) {
++	struct mount *mnt = real_mount(vfsmnt);
++
++	lock_mount_hash();
++	for (; mnt && mnt->mnt_parent && mnt != mnt->mnt_parent && mnt->mnt_id >= DEFAULT_KSU_MNT_ID; mnt = mnt->mnt_parent) { }
++	mntget(&mnt->mnt);
++	if (!mnt->mnt.mnt_root || IS_ERR(mnt->mnt.mnt_root)) {
++		mntput(&mnt->mnt);
++		unlock_mount_hash();
++		return vfsmnt;
++	}
++	dget(mnt->mnt.mnt_root);
++	unlock_mount_hash();
++	return &mnt->mnt;
++}
++#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+\ No newline at end of file
 diff --git a/fs/notify/fdinfo.c b/fs/notify/fdinfo.c
 index 55081ae3a..8630f2091 100644
 --- a/fs/notify/fdinfo.c
@@ -1040,10 +1074,10 @@ index 5a33ebd07..8d692d833 100644
  					goto out;
  				dst += ret;
 diff --git a/fs/proc/fd.c b/fs/proc/fd.c
-index 913bef0d2..efe09c66d 100644
+index 913bef0d2..3c571f21a 100644
 --- a/fs/proc/fd.c
 +++ b/fs/proc/fd.c
-@@ -13,6 +13,9 @@
+@@ -13,17 +13,27 @@
  #include <linux/fs.h>
  
  #include <linux/proc_fs.h>
@@ -1053,7 +1087,15 @@ index 913bef0d2..efe09c66d 100644
  
  #include "../mount.h"
  #include "internal.h"
-@@ -24,6 +27,9 @@ static int seq_show(struct seq_file *m, void *v)
+ #include "fd.h"
+ 
++#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
++struct mount *susfs_get_non_sus_mnt_from_mnt(struct mount *orig_mnt);
++#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
++
+ static int seq_show(struct seq_file *m, void *v)
+ {
+ 	struct files_struct *files = NULL;
  	int f_flags = 0, ret = -ENOENT;
  	struct file *file = NULL;
  	struct task_struct *task;
@@ -1063,7 +1105,7 @@ index 913bef0d2..efe09c66d 100644
  
  	task = get_proc_task(m->private);
  	if (!task)
-@@ -54,11 +60,58 @@ static int seq_show(struct seq_file *m, void *v)
+@@ -54,10 +64,53 @@ static int seq_show(struct seq_file *m, void *v)
  	if (ret)
  		return ret;
  
@@ -1089,14 +1131,10 @@ index 913bef0d2..efe09c66d 100644
 +		if (!path.dentry->d_inode) {
 +			goto out_path_put;
 +		}
-+		// - We have to iterate the mnt->mnt_parent until the mnt_id is not sus,
-+		//   doing real_mount(path.mnt)->mnt_id is wrong since this will retrieve
-+		//   the mnt_id of the umounted path.
-+		for (; mnt && mnt->mnt_parent && mnt != mnt->mnt_parent && mnt->mnt_id >= DEFAULT_KSU_MNT_ID; mnt = mnt->mnt_parent) { }
 +
 +		seq_printf(m, "pos:\t%lli\nflags:\t0%o\nmnt_id:\t%i\nino:\t%lu\n",
 +				(long long)file->f_pos, f_flags,
-+				mnt->mnt_id,
++				susfs_get_non_sus_mnt_from_mnt(mnt)->mnt_id,
 +				path.dentry->d_inode->i_ino);
 +		path_put(&path);
 +		kfree(pathname);
@@ -1117,11 +1155,10 @@ index 913bef0d2..efe09c66d 100644
  		   (long long)file->f_pos, f_flags,
  		   real_mount(file->f_path.mnt)->mnt_id,
  		   file_inode(file)->i_ino);
- 
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+ 
  	/* show_fd_locks() never deferences files so a stale value is safe */
  	show_fd_locks(m, file, files);
- 	if (seq_has_overflowed(m))
 diff --git a/fs/proc/task_mmu.c b/fs/proc/task_mmu.c
 index 0544c1f58..693220ccf 100644
 --- a/fs/proc/task_mmu.c
@@ -1738,7 +1775,7 @@ index ef50573c7..013391e93 100644
  		      AT_STATX_SYNC_TYPE))
  		return -EINVAL;
 diff --git a/fs/statfs.c b/fs/statfs.c
-index 96d1c3edf..9e8f18fde 100644
+index 96d1c3edf..04b55fd6f 100644
 --- a/fs/statfs.c
 +++ b/fs/statfs.c
 @@ -9,6 +9,10 @@
@@ -1747,25 +1784,44 @@ index 96d1c3edf..9e8f18fde 100644
  #include <linux/compat.h>
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +#include <linux/susfs_def.h>
-+#include "mount.h"
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
++
  #include "internal.h"
  
  static int flags_by_mnt(int mnt_flags)
-@@ -86,11 +90,23 @@ EXPORT_SYMBOL(vfs_get_fsid);
+@@ -83,14 +87,41 @@ int vfs_get_fsid(struct dentry *dentry, __kernel_fsid_t *fsid)
+ }
+ EXPORT_SYMBOL(vfs_get_fsid);
+ 
++#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
++extern struct vfsmount *susfs_get_non_sus_vfsmnt_from_vfsmnt(struct vfsmount *vfsmnt);
++#endif //#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
++
  int vfs_statfs(const struct path *path, struct kstatfs *buf)
  {
  	int error;
+-
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-+	struct mount *mnt;
- 
-+	mnt = real_mount(path->mnt);
-+	if (likely(susfs_is_current_proc_umounted())) {
-+		for (; mnt && mnt->mnt_parent && mnt != mnt->mnt_parent && mnt->mnt_id >= DEFAULT_KSU_MNT_ID; mnt = mnt->mnt_parent) { }
++	struct vfsmount *no_sus_vfsmnt = NULL;
++
++	if (likely(susfs_is_current_proc_umounted() && path->mnt)) {
++		no_sus_vfsmnt = susfs_get_non_sus_vfsmnt_from_vfsmnt(path->mnt);
++		if (path->mnt == no_sus_vfsmnt) {
++			dput(no_sus_vfsmnt->mnt_root);
++			mntput(no_sus_vfsmnt);
++			goto orig_flow;
++		}
++		error = statfs_by_dentry(no_sus_vfsmnt->mnt_root, buf);
++		if (!error)
++			buf->f_flags = calculate_f_flags(no_sus_vfsmnt);
++		dput(no_sus_vfsmnt->mnt_root);
++		mntput(no_sus_vfsmnt);
++		return error;
 +	}
-+	error = statfs_by_dentry(mnt->mnt.mnt_root, buf);
++orig_flow:
++	error = statfs_by_dentry(path->dentry, buf);
 +	if (!error)
-+		buf->f_flags = calculate_f_flags(&mnt->mnt);
++		buf->f_flags = calculate_f_flags(path->mnt);
 +	return error;
 +#else
  	error = statfs_by_dentry(path->dentry, buf);
