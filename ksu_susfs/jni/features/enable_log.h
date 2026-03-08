@@ -4,5 +4,5 @@
 void enable_log_print_help(void);
 int enable_log(int argc, char *argv[]);
 
-#endif
+#endif // #ifndef ENABLE_LOG_H
 

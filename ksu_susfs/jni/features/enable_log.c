@@ -6,9 +6,11 @@
 #include <sys/reboot.h>
 #include <sys/syscall.h>
 #include <errno.h>
-#include "def.h"
-#include "utils.h"
+#include <susfs_defs.h>
+#include <susfs_utils.h>
 #include "enable_log.h"
+
+#define CMD_SUSFS_ENABLE_LOG 0x555a0
 
 struct st_susfs_log {
 	bool                    enabled;
@@ -17,7 +19,8 @@ struct st_susfs_log {
 
 void enable_log_print_help(void){
 	log("    enable_log <0|1>\n");
-	log("      |--> 0: disable susfs log in kernel, 1: enable susfs log in kernel\n");
+	log("      |--> 0: disable susfs log in kernel\n");
+	log("      |--> 1: enable susfs log in kernel\n");
 	log("\n");
 }
 

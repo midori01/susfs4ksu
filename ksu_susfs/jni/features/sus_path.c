@@ -5,9 +5,12 @@
 #include <sys/reboot.h>
 #include <sys/syscall.h>
 #include <errno.h>
-#include "def.h"
-#include "utils.h"
+#include <susfs_defs.h>
+#include <susfs_utils.h>
 #include "sus_path.h"
+
+#define CMD_SUSFS_ADD_SUS_PATH 0x55550
+#define CMD_SUSFS_ADD_SUS_PATH_LOOP 0x55553
 
 struct st_susfs_sus_path {
 	unsigned long           target_ino;
@@ -19,10 +22,15 @@ struct st_susfs_sus_path {
 void sus_path_print_help(void){
 	log("    add_sus_path </path/of/file_or_directory>\n");
 	log("      |--> Added path and all its sub-paths will be hidden for umounted app process from several syscalls\n");
-	log("      |--> Please be reminded that the target path must be added after the bind mount or overlay operation if any, otherwise it won't be effective\n");
+	log("      |--> Please be reminded that if the target path has upper mounts then make sure the proper layer is added, otherwise it may not be effective for the target process.\n");
+	log("      * Important Notes *\n");
+	log("      - Only effective for umounted process with uid >= 10000\n");
 	log("\n");
-	log("    add_sus_path_loop </path/not/inside/sdcard>\n");
+	log("    add_sus_path_loop </path/of/file_or_directory>\n");
 	log("      |--> The only difference to add_sus_path is that the added sus_path via this cli will be flagged as SUS_PATH again for the app process when it is being spawned by zygote and marked umounted\n");
+	log("      |--> Also it does not check if the path is existed or not, instead it checks for empty string only, so be careful what to add.\n");
+	log("      * Important Notes *\n");
+	log("      - Only effective for umounted process with uid >= 10000\n");
 	log("\n");
 }
 
@@ -63,11 +71,11 @@ int add_sus_path_loop(int argc, char *argv[]) {
 		return -EINVAL;
 	}
 
-	info.err = get_file_stat(argv[2], &sb);
-	if (info.err) {
-		log("[-] failed to get stat from path: '%s'\n", argv[2]);
-		return info.err;
+	if (*argv[2] == '\0') {
+		log("[-] argv[2] is empty'\n");
+		return -EINVAL;
 	}
+
 	strncpy(info.target_pathname, argv[2], SUSFS_MAX_LEN_PATHNAME-1);
 	info.target_ino = sb.st_ino;
 	info.i_uid = sb.st_uid;

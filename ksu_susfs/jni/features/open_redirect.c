@@ -6,9 +6,11 @@
 #include <errno.h>
 #include <sys/reboot.h>
 #include <sys/syscall.h>
-#include "def.h"
-#include "utils.h"
+#include <susfs_defs.h>
+#include <susfs_utils.h>
 #include "open_redirect.h"
+
+#define CMD_SUSFS_ADD_OPEN_REDIRECT 0x555c0
 
 struct st_susfs_open_redirect {
 	unsigned long           target_ino;
@@ -20,6 +22,8 @@ struct st_susfs_open_redirect {
 void open_redirect_print_help(void){
 	log("    add_open_redirect </target/path> </redirected/path>\n");
 	log("      |--> Redirect the target path to be opened with user defined path\n");
+	log("      * Important Notes *\n");
+	log("      - Only effective for current process with uid <= 2000\n");
 	log("\n");
 }
 

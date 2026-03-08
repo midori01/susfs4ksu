@@ -4,5 +4,5 @@
 void set_uname_print_help(void);
 int set_uname(int argc, char *argv[]);
 
-#endif
+#endif // #ifndef SPOOF_UNAME_H
 

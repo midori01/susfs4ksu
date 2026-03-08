@@ -6,9 +6,13 @@
 #include <sys/reboot.h>
 #include <sys/syscall.h>
 #include <errno.h>
-#include "def.h"
-#include "utils.h"
+#include <susfs_defs.h>
+#include <susfs_utils.h>
 #include "sus_kstat.h"
+
+#define CMD_SUSFS_ADD_SUS_KSTAT 0x55570
+#define CMD_SUSFS_UPDATE_SUS_KSTAT 0x55571
+#define CMD_SUSFS_ADD_SUS_KSTAT_STATICALLY 0x55572
 
 struct st_susfs_sus_kstat {
 	bool                    is_statically;
@@ -56,18 +60,26 @@ void sus_kstat_print_help(void){
 	log("      |--> e.g., %s add_sus_kstat_statically '/system/addon.d' 'default' 'default' 'default' 'default'\\\n", TAG);
 	log("                    '1712592355' 'default' '1712592355' 'default' '1712592355' 'default'\\\n");
 	log("                    'default' 'default'\n");
+	log("      * Important Notes *\n");
+	log("      - Only effective for umounted process with uid >= 10000\n");
 	log("\n");
 	log("    add_sus_kstat </path/of/file_or_directory>\n");
 	log("      |--> Add the desired path BEFORE it gets bind mounted or overlayed, this is used for storing original stat info in kernel memory\n");
 	log("      |--> This command must be completed with <update_sus_kstat> later after the added path is bind mounted or overlayed\n");
+	log("      * Important Notes *\n");
+	log("      - Only effective for umounted process with uid >= 10000\n");
 	log("\n");
 	log("    update_sus_kstat </path/of/file_or_directory>\n");
 	log("      |--> Add the desired path you have added before via <add_sus_kstat> to complete the kstat spoofing procedure\n");
 	log("      |--> This updates the target ino, but size and blocks are remained the same as current stat\n");
+	log("      * Important Notes *\n");
+	log("      - Only effective for umounted process with uid >= 10000\n");
 	log("\n");
 	log("    update_sus_kstat_full_clone </path/of/file_or_directory>\n");
 	log("      |--> Add the desired path you have added before via <add_sus_kstat> to complete the kstat spoofing procedure\n");
 	log("      |--> This updates the target ino only, other stat members are remained the same as the original stat\n");
+	log("      * Important Notes *\n");
+	log("      - Only effective for umounted process with uid >= 10000\n");
 	log("\n");
 }
 

@@ -7,4 +7,4 @@ int add_sus_kstat(int argc, char *argv[]);
 int update_sus_kstat(int argc, char *argv[]);
 int update_sus_kstat_full_clone(int argc, char *argv[]);
 
-#endif
+#endif // #ifndef SUS_KSTAT_H

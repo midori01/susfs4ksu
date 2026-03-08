@@ -4,5 +4,5 @@
 void sus_map_print_help(void);
 int add_sus_map(int argc, char *argv[]);
 
-#endif
+#endif // #ifndef SUS_MAP_H
 

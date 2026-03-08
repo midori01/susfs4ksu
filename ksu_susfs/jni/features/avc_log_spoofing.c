@@ -6,9 +6,11 @@
 #include <sys/reboot.h>
 #include <sys/syscall.h>
 #include <errno.h>
-#include "def.h"
-#include "utils.h"
+#include <susfs_defs.h>
+#include <susfs_utils.h>
 #include "avc_log_spoofing.h"
+
+#define CMD_SUSFS_ENABLE_AVC_LOG_SPOOFING 0x60010
 
 struct st_susfs_avc_log_spoofing {
 	bool                    enabled;
@@ -17,11 +19,11 @@ struct st_susfs_avc_log_spoofing {
 
 void enable_avc_log_spoofing_print_help(void){
 	log("    enable_avc_log_spoofing <0|1>\n");
-	log("      |--> 0: disable spoofing the sus 'su' tcontext shown in avc log in kernel\n");
-	log("      |--> 1: enable spoofing the sus tcontext 'su' with 'kernel' shown in avc log in kernel\n");
-	log("      * Important Note *\n");
+	log("      |--> 0: disable spoofing the sus tcontext 'su' shown in avc log in kernel\n");
+	log("      |--> 1: enable spoofing the sus tcontext 'su' with 'u:r:priv_app:s0:c512,c768' shown in avc log in kernel\n");
+	log("      * Important Notes *\n");
 	log("      - It is set to '0' by default in kernel\n");
-	log("      - Enabling this will sometimes make developers hard to identify the cause when they are debugging with some permission or selinux issue, so users are advised to disable this when doing so.\n");
+	log("      - Enabling this may sometimes make developers hard to identify the cause when they are debugging with some permission or selinux issues, so users are advised to disable this when doing so.\n");
 	log("\n");
 }
 

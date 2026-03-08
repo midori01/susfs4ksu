@@ -4,5 +4,5 @@
 void show_print_help(void);
 int show(int argc, char *argv[]);
 
-#endif
+#endif // #ifndef SHOW_H
 

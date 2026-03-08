@@ -6,9 +6,13 @@
 #include <sys/reboot.h>
 #include <sys/syscall.h>
 #include <errno.h>
-#include "def.h"
-#include "utils.h"
+#include <susfs_defs.h>
+#include <susfs_utils.h>
 #include "spoof_uname.h"
+
+#define CMD_SUSFS_SET_CMDLINE_OR_BOOTCONFIG 0x555b0
+
+#define SUSFS_FAKE_CMDLINE_OR_BOOTCONFIG_SIZE 8192
 
 struct st_susfs_spoof_cmdline_or_bootconfig {
 	char                    fake_cmdline_or_bootconfig[SUSFS_FAKE_CMDLINE_OR_BOOTCONFIG_SIZE];

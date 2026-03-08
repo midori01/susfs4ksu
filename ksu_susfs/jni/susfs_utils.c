@@ -1,6 +1,6 @@
 #include <errno.h>
-#include "def.h"
-#include "utils.h"
+#include "susfs_defs.h"
+#include "susfs_utils.h"
 
 int isNumeric(char* str) {
         // Check if the string is empty

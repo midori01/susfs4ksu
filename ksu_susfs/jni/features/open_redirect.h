@@ -4,5 +4,5 @@
 void open_redirect_print_help(void);
 int add_open_redirect(int argc, char *argv[]);
 
-#endif
+#endif // #ifndef OPEN_REDIRECT_H
 
