@@ -22,10 +22,15 @@ static void print_help(void) {
 	show_print_help();
 }
 
-static inline void pre_check() {
+static inline void pre_check(int argc) {
 	if (getuid() != 0) {
 		log("[-] Must run as root\n");
 		exit(-EPERM);
+	}
+
+	if (argc < 2) {
+		print_help();
+		exit(-EINVAL);
 	}
 }
 
@@ -33,43 +38,37 @@ static inline void pre_check() {
  ** Main Function **
  *******************/
 int main(int argc, char *argv[]) {
-	pre_check();
-	switch(argc) {
-		case 3:
-			if (!strcmp(argv[1], "add_sus_path"))
-				return add_sus_path(argc, argv);
-			if (!strcmp(argv[1], "add_sus_path_loop"))
-				return add_sus_path_loop(argc, argv);
-			if (!strcmp(argv[1], "hide_sus_mnts_for_non_su_procs"))
-				return hide_sus_mnts_for_non_su_procs(argc, argv);
-			if (!strcmp(argv[1], "add_sus_kstat"))
-				return add_sus_kstat(argc, argv);
-			if (!strcmp(argv[1], "update_sus_kstat"))
-				return update_sus_kstat(argc, argv);
-			if (!strcmp(argv[1], "update_sus_kstat_full_clone"))
-				return update_sus_kstat_full_clone(argc, argv);
-			if (!strcmp(argv[1], "enable_log"))
-				return enable_log(argc, argv);
-			if (!strcmp(argv[1], "set_cmdline_or_bootconfig"))
-				return set_cmdline_or_bootconfig(argc, argv);
-			if (!strcmp(argv[1], "add_sus_map"))
-				return add_sus_map(argc, argv);
-			if (!strcmp(argv[1], "enable_avc_log_spoofing"))
-				return enable_avc_log_spoofing(argc, argv);
-			if (!strcmp(argv[1], "show"))
-				return show(argc, argv);
-		case 4:
-			if (!strcmp(argv[1], "set_uname"))
-				return set_uname(argc, argv);
-			if (!strcmp(argv[1], "add_open_redirect"))
-				return add_open_redirect(argc, argv);
-		case 15:
-			if (!strcmp(argv[1], "add_sus_kstat_statically"))
-				return add_sus_kstat_statically(argc, argv);
-		default:
-			print_help();
-			exit(-EINVAL);
-	}
-	return 0;
+	pre_check(argc);
+
+	if (!strcmp(argv[1], "add_sus_path"))
+		return add_sus_path(argc, argv);
+	if (!strcmp(argv[1], "add_sus_path_loop"))
+		return add_sus_path_loop(argc, argv);
+	if (!strcmp(argv[1], "hide_sus_mnts_for_non_su_procs"))
+		return hide_sus_mnts_for_non_su_procs(argc, argv);
+	if (!strcmp(argv[1], "add_sus_map"))
+		return add_sus_map(argc, argv);
+	if (!strcmp(argv[1], "add_open_redirect"))
+		return add_open_redirect(argc, argv);
+	if (!strcmp(argv[1], "add_sus_kstat_statically"))
+		return add_sus_kstat_statically(argc, argv);
+	if (!strcmp(argv[1], "add_sus_kstat"))
+		return add_sus_kstat(argc, argv);
+	if (!strcmp(argv[1], "update_sus_kstat"))
+		return update_sus_kstat(argc, argv);
+	if (!strcmp(argv[1], "update_sus_kstat_full_clone"))
+		return update_sus_kstat_full_clone(argc, argv);
+	if (!strcmp(argv[1], "enable_log"))
+		return enable_log(argc, argv);
+	if (!strcmp(argv[1], "set_cmdline_or_bootconfig"))
+		return set_cmdline_or_bootconfig(argc, argv);
+	if (!strcmp(argv[1], "enable_avc_log_spoofing"))
+		return enable_avc_log_spoofing(argc, argv);
+	if (!strcmp(argv[1], "show"))
+		return show(argc, argv);
+	if (!strcmp(argv[1], "set_uname"))
+		return set_uname(argc, argv);
+	print_help();
+	return -EINVAL;
 }
 
