@@ -64,7 +64,7 @@ int add_sus_path(int argc, char *argv[]) {
 
 int add_sus_path_loop(int argc, char *argv[]) {
 	struct st_susfs_sus_path info = {0};
-	struct stat sb;
+	struct stat sb = {0};
 
 	if (argc != 3) {
 		print_help();
