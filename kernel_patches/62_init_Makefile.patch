@@ -1,14 +1,27 @@
 diff --git a/init/Makefile b/init/Makefile
-index 8316c23be..022196b12 100644
+index 8316c23be..0063e10eb 100644
 --- a/init/Makefile
 +++ b/init/Makefile
-@@ -29,7 +29,8 @@ preempt-flag-$(CONFIG_PREEMPT_DYNAMIC)	:= PREEMPT_DYNAMIC
+@@ -28,8 +28,10 @@ preempt-flag-$(CONFIG_PREEMPT_BUILD)	:= PREEMPT
+ preempt-flag-$(CONFIG_PREEMPT_DYNAMIC)	:= PREEMPT_DYNAMIC
  preempt-flag-$(CONFIG_PREEMPT_RT)	:= PREEMPT_RT
  
- build-version = $(or $(KBUILD_BUILD_VERSION), $(build-version-auto))
+-build-version = $(or $(KBUILD_BUILD_VERSION), $(build-version-auto))
 -build-timestamp = $(or $(KBUILD_BUILD_TIMESTAMP), $(build-timestamp-auto))
++#build-version = $(or $(KBUILD_BUILD_VERSION), $(build-version-auto))
 +#build-timestamp = $(or $(KBUILD_BUILD_TIMESTAMP), $(build-timestamp-auto))
++build-version = 1
 +build-timestamp = "Mon Oct  6 16:50:48 UTC 2025"
  
  # Maximum length of UTS_VERSION is 64 chars
  filechk_uts_version = \
+@@ -52,7 +54,8 @@ CFLAGS_version.o := -include $(obj)/utsversion-tmp.h
+ # Build version-timestamp.c with final UTS_VERSION
+ #
+ 
+-include/generated/utsversion.h: build-version-auto = $(shell $(srctree)/$(src)/build-version)
++#include/generated/utsversion.h: build-version-auto = $(shell $(srctree)/$(src)/build-version)
++include/generated/utsversion.h: build-version-auto = 1
+ include/generated/utsversion.h: build-timestamp-auto = $(shell LC_ALL=C date)
+ include/generated/utsversion.h: FORCE
+ 	$(call filechk,uts_version)
