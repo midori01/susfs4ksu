@@ -1841,20 +1841,6 @@ index 96d1c3edf..04b55fd6f 100644
  }
  EXPORT_SYMBOL(vfs_statfs);
  
-diff --git a/init/Makefile b/init/Makefile
-index 8316c23be..022196b12 100644
---- a/init/Makefile
-+++ b/init/Makefile
-@@ -29,7 +29,8 @@ preempt-flag-$(CONFIG_PREEMPT_DYNAMIC)	:= PREEMPT_DYNAMIC
- preempt-flag-$(CONFIG_PREEMPT_RT)	:= PREEMPT_RT
- 
- build-version = $(or $(KBUILD_BUILD_VERSION), $(build-version-auto))
--build-timestamp = $(or $(KBUILD_BUILD_TIMESTAMP), $(build-timestamp-auto))
-+#build-timestamp = $(or $(KBUILD_BUILD_TIMESTAMP), $(build-timestamp-auto))
-+build-timestamp = "Mon Oct  6 16:50:48 UTC 2025"
- 
- # Maximum length of UTS_VERSION is 64 chars
- filechk_uts_version = \
 diff --git a/kernel/kallsyms.c b/kernel/kallsyms.c
 index 824bcc7b5..1087f73dd 100644
 --- a/kernel/kallsyms.c
@@ -2000,17 +1986,6 @@ index 7595dc25d..f01800422 100644
  
  	if (copy_to_user(name, &tmp, sizeof(tmp)))
  		return -EFAULT;
-diff --git a/scripts/setlocalversion b/scripts/setlocalversion
-index 1b733ae4c..1db2d4e47 100755
---- a/scripts/setlocalversion
-+++ b/scripts/setlocalversion
-@@ -170,4 +170,5 @@ if test -n "${BUILD_NUMBER}"; then
- 	res="$res-ab${BUILD_NUMBER}"
- fi
- 
--echo "$res"
-+#echo "$res"
-+echo "-android14-11-gc1de4747ac59-ab14219743"
 diff --git a/security/selinux/avc.c b/security/selinux/avc.c
 index d93af9249..b25ca19e9 100644
 --- a/security/selinux/avc.c
