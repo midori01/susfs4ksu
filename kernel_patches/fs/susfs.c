@@ -344,12 +344,13 @@ void susfs_add_sus_kstat(void __user **user_info) {
 				spin_unlock(&susfs_spin_lock_sus_kstat);
 				synchronize_rcu();
 				kfree(tmp_entry);
-				break;
+				goto out_add_new_entry;
 			}
 		}
 		spin_unlock(&susfs_spin_lock_sus_kstat);
 	}
 
+out_add_new_entry:
 #if defined(__ARCH_WANT_STAT64) || defined(__ARCH_WANT_COMPAT_STAT64)
 #ifdef CONFIG_MIPS
 	info.spoofed_dev = new_decode_dev(info.spoofed_dev);
@@ -429,14 +430,14 @@ void susfs_update_sus_kstat(void __user **user_info) {
 			spin_unlock(&susfs_spin_lock_sus_kstat);
 			synchronize_rcu();
 			kfree(tmp_entry);
-			goto found_update;
+			goto out_add_new_entry;
 		}
 	}
 	spin_unlock(&susfs_spin_lock_sus_kstat);
 	info.err = -ENOENT;
 	goto out_copy_to_user;
 
-found_update:
+out_add_new_entry:
 	info.err = susfs_mark_inode_sus_kstat(new_entry->info.target_pathname, new_entry);
 	if (info.err) {
 		kfree(new_entry);
