@@ -499,7 +499,8 @@ out_spoof_kstat:
 			entry->target_dev == target_dev &&
 			entry->is_fuse == is_fuse)
 		{
-			SUSFS_LOGI("spoofing kstat for target_ino: %lu, target_dev: %u\n", target_ino, target_dev);
+			SUSFS_LOGI("spoofing kstat for path: %s, target_ino: %lu, target_dev: %u\n",
+					entry->info.target_pathname, target_ino, target_dev);
 			if (entry->info.flags & KSTAT_SPOOF_INO)
 				stat->ino = entry->info.spoofed_ino;
 			if (entry->info.flags & KSTAT_SPOOF_DEV)
