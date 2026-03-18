@@ -814,6 +814,14 @@ void susfs_add_open_redirect(void __user **user_info) {
 	spin_lock(&susfs_spin_lock_open_redirect);
 	hash_for_each_possible(OPEN_REDIRECT_HLIST, tmp_entry_target, node, target_inode->i_ino) {
 		if (!strcmp(tmp_entry_target->info.target_pathname, info.target_pathname)) {
+			if (tmp_entry_target->reversed_lookup_only) {
+				SUSFS_LOGE("duplicated '%s' cannot be removed/added because it is used for reversed lookup only\n", info.target_pathname);
+				spin_unlock(&susfs_spin_lock_open_redirect);
+				info.err = -EINVAL;
+				kfree(new_entry_redirected);
+				kfree(new_entry_target);
+				goto out_path_put_target_path;
+			}
 			is_first_dup_found = true;
 			hash_del_rcu(&tmp_entry_target->node);
 			break;
@@ -830,9 +838,9 @@ void susfs_add_open_redirect(void __user **user_info) {
 		}
 		spin_unlock(&susfs_spin_lock_open_redirect);
 		synchronize_rcu();
-		kfree(tmp_entry_target);
 		if (is_second_dup_found)
 			kfree(tmp_entry_redirected);
+		kfree(tmp_entry_target);
 		goto out_add_new_entry;
 	}
 	spin_unlock(&susfs_spin_lock_open_redirect);
