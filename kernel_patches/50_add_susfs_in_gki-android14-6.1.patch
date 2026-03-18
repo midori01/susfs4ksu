@@ -80,7 +80,7 @@ index 4f25015aa..17e9e15af 100644
  		return NULL;
  	return dentry->d_fsdata;
 diff --git a/fs/exec.c b/fs/exec.c
-index 9ba6e0b73..be8030379 100644
+index a03d486c1..ea3eeb527 100644
 --- a/fs/exec.c
 +++ b/fs/exec.c
 @@ -64,6 +64,9 @@
@@ -91,9 +91,9 @@ index 9ba6e0b73..be8030379 100644
 +#include <linux/susfs_def.h>
 +#endif
  
- #include <linux/uaccess.h>
- #include <asm/mmu_context.h>
-@@ -1918,6 +1921,17 @@ static int bprm_execve(struct linux_binprm *bprm,
+ #ifndef __GENKSYMS__
+ #include <linux/dma-buf.h>
+@@ -1942,6 +1945,17 @@ static int bprm_execve(struct linux_binprm *bprm,
  	return retval;
  }
  
@@ -111,7 +111,7 @@ index 9ba6e0b73..be8030379 100644
  static int do_execveat_common(int fd, struct filename *filename,
  			      struct user_arg_ptr argv,
  			      struct user_arg_ptr envp,
-@@ -1929,6 +1943,20 @@ static int do_execveat_common(int fd, struct filename *filename,
+@@ -1953,6 +1967,20 @@ static int do_execveat_common(int fd, struct filename *filename,
  	if (IS_ERR(filename))
  		return PTR_ERR(filename);
  
@@ -895,7 +895,7 @@ index 55081ae3a..8630f2091 100644
  			   inode_mark->wd, inode->i_ino, inode->i_sb->s_dev,
  			   inotify_mark_user_mask(mark));
 diff --git a/fs/open.c b/fs/open.c
-index 0894b354b..82a02e4cd 100644
+index 0894b354b..0ec49a454 100644
 --- a/fs/open.c
 +++ b/fs/open.c
 @@ -33,6 +33,9 @@
@@ -956,7 +956,7 @@ index 0894b354b..82a02e4cd 100644
  	int fd = build_open_flags(how, &op);
  	struct filename *tmp;
 +#ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
-+	char *redirected_name;
++	char *redirected_name = NULL;
 +	bool is_inode_open_redirect = false;
 +#endif // #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
  
