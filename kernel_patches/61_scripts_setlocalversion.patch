@@ -1,11 +1,20 @@
 diff --git a/scripts/setlocalversion b/scripts/setlocalversion
-index 1b733ae4c..1db2d4e47 100755
+index 1b733ae4c..b9ce5860c 100755
 --- a/scripts/setlocalversion
 +++ b/scripts/setlocalversion
+@@ -104,7 +104,7 @@ scm_version()
+ 			git --no-optional-locks status -uno --porcelain 2>/dev/null ||
+ 			git diff-index --name-only HEAD
+ 		} | read dummy; then
+-			printf '%s' -dirty
++			printf '%s' ''
+ 		fi
+ 	fi
+ }
 @@ -170,4 +170,5 @@ if test -n "${BUILD_NUMBER}"; then
  	res="$res-ab${BUILD_NUMBER}"
  fi
  
 -echo "$res"
 +#echo "$res"
-+echo "-android14-11-gc1de4747ac59-ab14219743"
++echo "-android14-11-gfa1d6308d1fe-ab14691759"

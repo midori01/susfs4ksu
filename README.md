@@ -5,7 +5,7 @@ This branch is exclusive for pixel8 (Shiba) only, it is based on latest sultan u
 
 - Official KernelSU: https://github.com/tiann/KernelSU
 
-- Based on Factory Images with Security Patch 2026-02-05
+- Tested working on Factory Images with Security Patch 2026-03-05
 
 ## Requirements ##
 - Full Stock Factory Pixel 8 (Shiba) images
@@ -23,8 +23,6 @@ This branch is exclusive for pixel8 (Shiba) only, it is based on latest sultan u
     * CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
     * CONFIG_KSU_SUSFS_OPEN_REDIRECT
     * CONFIG_KSU_SUSFS_SUS_MAP
-
-- Users may enable the disabled features by themselves such as SUS_PATH, SUS_KSTAT, OPEN_REDIRECT, etc..
 
 - Bypass the kprobe and tracepoint hooks used by the official KSU, all susfs hooks are fully inlined now, including sucompat hooks.
 
