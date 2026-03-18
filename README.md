@@ -14,11 +14,14 @@ This branch is exclusive for pixel8 (Shiba) only, it is based on latest sultan u
 
 ## Features ##
 - Minimal SUSFS features which by default enables only the following:
+    * CONFIG_KSU_SUSFS_SUS_PATH
+    * CONFIG_KSU_SUSFS_SUS_KSTAT
     * CONFIG_KSU_SUSFS_SUS_MOUNT
     * CONFIG_KSU_SUSFS_SPOOF_UNAME
     * CONFIG_KSU_SUSFS_ENABLE_LOG
     * CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS
     * CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
+    * CONFIG_KSU_SUSFS_OPEN_REDIRECT
     * CONFIG_KSU_SUSFS_SUS_MAP
 
 - Users may enable the disabled features by themselves such as SUS_PATH, SUS_KSTAT, OPEN_REDIRECT, etc..
