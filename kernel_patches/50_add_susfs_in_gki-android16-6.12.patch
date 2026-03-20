@@ -1276,7 +1276,7 @@ index 5e391cbca..92646261b 100644
  	/* show_fd_locks() never dereferences files, so a stale value is safe */
  	show_fd_locks(m, file, files);
 diff --git a/fs/proc/task_mmu.c b/fs/proc/task_mmu.c
-index 7cd33b742..3564fb1df 100644
+index 7cd33b742..0ec632f91 100644
 --- a/fs/proc/task_mmu.c
 +++ b/fs/proc/task_mmu.c
 @@ -27,6 +27,9 @@
@@ -1294,7 +1294,7 @@ index 7cd33b742..3564fb1df 100644
  }
  
 +#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
-+extern void susfs_show_map_vma_spoofer(struct inode *inode, dev_t *out_dev, unsigned long *out_ino);
++extern void susfs_sus_kstat_spoof_show_map_vma(struct inode *inode, dev_t *out_dev, unsigned long *out_ino);
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
 +#ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
 +extern int susfs_open_redirect_spoof_show_map_vma(struct inode *inode, unsigned long *out_ino, dev_t *out_dev, char *spoofed_name);
@@ -1349,7 +1349,7 @@ index 7cd33b742..3564fb1df 100644
  		ino = inode->i_ino;
  		pgoff = ((loff_t)vma->vm_pgoff) << PAGE_SHIFT;
 +#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
-+		susfs_show_map_vma_spoofer((struct inode *)inode, &dev, &ino);
++		susfs_sus_kstat_spoof_show_map_vma((struct inode *)inode, &dev, &ino);
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
  	}
  
@@ -1834,7 +1834,7 @@ index 6d29cab85..77213f638 100644
  	if (error >= 0)
  		error = buf.error;
 diff --git a/fs/stat.c b/fs/stat.c
-index adb071bc9..e62f1d5e7 100644
+index adb071bc9..4233659b3 100644
 --- a/fs/stat.c
 +++ b/fs/stat.c
 @@ -20,12 +20,22 @@
@@ -1852,7 +1852,7 @@ index adb071bc9..e62f1d5e7 100644
  #include "mount.h"
  
 +#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
-+extern void susfs_generic_fillattr_spoofer(struct inode *inode, struct kstat *stat);
++extern void susfs_sus_kstat_spoof_generic_fillattr(struct inode *inode, struct kstat *stat);
 +extern int susfs_get_non_sus_mnt_id_from_mnt(struct mount *orig_mnt);
 +extern u64 susfs_get_non_sus_mnt_id_unique_from_mnt(struct mount *orig_mnt);
 +#endif
@@ -1865,7 +1865,7 @@ index adb071bc9..e62f1d5e7 100644
  	stat->blksize = i_blocksize(inode);
  	stat->blocks = inode->i_blocks;
 +#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
-+	susfs_generic_fillattr_spoofer(inode, stat);
++	susfs_sus_kstat_spoof_generic_fillattr(inode, stat);
 +#endif
  
  	if ((request_mask & STATX_CHANGE_COOKIE) && IS_I_VERSION(inode)) {
@@ -1880,7 +1880,7 @@ index adb071bc9..e62f1d5e7 100644
 +					    request_mask,
 +					    query_flags | AT_GETATTR_NOSEC);
 +		if (!err)
-+			susfs_generic_fillattr_spoofer(inode, stat);
++			susfs_sus_kstat_spoof_generic_fillattr(inode, stat);
 +		return err;
 +	}
 +#else
