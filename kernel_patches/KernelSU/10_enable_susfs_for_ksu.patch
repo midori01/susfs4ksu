@@ -1133,13 +1133,13 @@ index b8d26982..cdac225d 100644
                                 void *__never_use_argv, void *__never_use_envp,
                                 int *__never_use_flags);
 diff --git a/kernel/supercalls.c b/kernel/supercalls.c
-index 475a6671..54a41fb7 100644
+index c4b47fde..428858a3 100644
 --- a/kernel/supercalls.c
 +++ b/kernel/supercalls.c
-@@ -11,6 +11,10 @@
- #include <linux/task_work.h>
+@@ -12,6 +12,10 @@
  #include <linux/uaccess.h>
  #include <linux/version.h>
+ #include <linux/pid.h>
 +#ifdef CONFIG_KSU_SUSFS
 +#include <linux/namei.h>
 +#include <linux/susfs.h>
@@ -1147,7 +1147,7 @@ index 475a6671..54a41fb7 100644
  
  #include "supercalls.h"
  #include "arch.h"
-@@ -121,6 +125,9 @@ static int do_report_event(void __user *arg)
+@@ -122,6 +126,9 @@ static int do_report_event(void __user *arg)
              } else {
                  pr_info("boot_complete triggered\n");
                  on_boot_completed();
@@ -1157,7 +1157,7 @@ index 475a6671..54a41fb7 100644
              }
          }
          break;
-@@ -356,7 +363,6 @@ static int do_set_app_profile(void __user *arg)
+@@ -357,7 +364,6 @@ static int do_set_app_profile(void __user *arg)
      ret = ksu_set_app_profile(&cmd.profile);
      if (!ret) {
          ksu_persistent_allow_list();
@@ -1165,7 +1165,7 @@ index 475a6671..54a41fb7 100644
      }
      return ret;
  }
-@@ -434,44 +440,29 @@ static int do_manage_mark(void __user *arg)
+@@ -435,44 +441,29 @@ static int do_manage_mark(void __user *arg)
  
      switch (cmd.operation) {
      case KSU_MARK_GET: {
@@ -1220,7 +1220,7 @@ index 475a6671..54a41fb7 100644
          break;
      }
      default: {
-@@ -734,40 +725,114 @@ static void ksu_install_fd_tw_func(struct callback_head *cb)
+@@ -759,40 +750,114 @@ static void ksu_install_fd_tw_func(struct callback_head *cb)
      kfree(tw);
  }
  
@@ -1350,7 +1350,7 @@ index 475a6671..54a41fb7 100644
  void ksu_supercalls_init(void)
  {
      int i;
-@@ -777,28 +842,10 @@ void ksu_supercalls_init(void)
+@@ -802,28 +867,10 @@ void ksu_supercalls_init(void)
          pr_info("  %-18s = 0x%08x\n", ksu_ioctl_handlers[i].name,
                  ksu_ioctl_handlers[i].cmd);
      }
