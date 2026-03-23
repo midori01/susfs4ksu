@@ -204,7 +204,7 @@ index 7842a430..065fef18 100644
      pr_info("handle umount for uid: %d, pid: %d\n", new_uid, current->pid);
  
 diff --git a/kernel/ksu.c b/kernel/ksu.c
-index 2d86038f..f1b28528 100644
+index 2d86038f..97cfb258 100644
 --- a/kernel/ksu.c
 +++ b/kernel/ksu.c
 @@ -6,6 +6,9 @@
@@ -234,7 +234,28 @@ index 2d86038f..f1b28528 100644
  
  // workaround for A12-5.10 kernel
  // Some third-party kernel (e.g. linegaeOS) uses wrong toolchain, which supports
-@@ -94,8 +98,6 @@ int __init kernelsu_init(void)
+@@ -59,7 +63,6 @@ __attribute__((naked)) int __init kernelsu_init_early(void)
+ #endif
+ 
+ struct cred *ksu_cred;
+-bool ksu_late_loaded;
+ 
+ #ifdef CONFIG_KSU_DEBUG
+ bool allow_shell = true;
+@@ -70,12 +73,6 @@ module_param(allow_shell, bool, 0);
+ 
+ int __init kernelsu_init(void)
+ {
+-#ifdef MODULE
+-    ksu_late_loaded = (current->pid != 1);
+-#else
+-    ksu_late_loaded = false;
+-#endif
+-
+ #ifdef CONFIG_KSU_DEBUG
+     pr_alert("*************************************************************");
+     pr_alert("**     NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE    **");
+@@ -94,52 +91,24 @@ int __init kernelsu_init(void)
          pr_err("prepare cred failed!\n");
      }
  
@@ -243,47 +264,61 @@ index 2d86038f..f1b28528 100644
      ksu_feature_init();
  
      ksu_supercalls_init();
-@@ -115,9 +117,17 @@ int __init kernelsu_init(void)
-         ksu_allowlist_init();
-         ksu_load_allow_list();
+ 
+-    if (ksu_late_loaded) {
+-        pr_info("late load mode, skipping kprobe hooks\n");
+-
+-        apply_kernelsu_rules();
+-        cache_sid();
+-        setup_ksu_cred();
+-
+-        // Grant current process (ksud late-load) root
+-        // with KSU SELinux domain before enforcing SELinux, so it
+-        // can continue to access /data/app etc. after enforcement.
+-        escape_to_root_for_init();
++#ifdef CONFIG_KSU_SUSFS
++    ksu_setuid_hook_init();
++    ksu_sucompat_init();
++#endif // #ifdef CONFIG_KSU_SUSFS
+ 
+-        ksu_allowlist_init();
+-        ksu_load_allow_list();
++    ksu_allowlist_init();
  
 -        ksu_syscall_hook_manager_init();
++    ksu_throne_tracker_init();
+ 
+-        ksu_throne_tracker_init();
+-        ksu_observer_init();
+-        ksu_file_wrapper_init();
 +#ifdef CONFIG_KSU_SUSFS
-+        ksu_setuid_hook_init();
-+        ksu_sucompat_init();
++    susfs_init();
 +#endif // #ifdef CONFIG_KSU_SUSFS
  
-         ksu_throne_tracker_init();
-+
-+#ifdef CONFIG_KSU_SUSFS
-+        susfs_init();
-+#endif // #ifdef CONFIG_KSU_SUSFS
-+
-         ksu_observer_init();
-         ksu_file_wrapper_init();
- 
-@@ -130,13 +140,18 @@ int __init kernelsu_init(void)
-         }
- 
-     } else {
+-        ksu_boot_completed = true;
+-        track_throne(false);
+-
+-        if (!getenforce()) {
+-            pr_info("Permissive SELinux, enforcing\n");
+-            setenforce(true);
+-        }
+-
+-    } else {
 -        ksu_syscall_hook_manager_init();
-+#ifdef CONFIG_KSU_SUSFS
-+        ksu_setuid_hook_init();
-+        ksu_sucompat_init();
-+#endif // #ifdef CONFIG_KSU_SUSFS
- 
-         ksu_allowlist_init();
- 
-         ksu_throne_tracker_init();
- 
+-
+-        ksu_allowlist_init();
+-
+-        ksu_throne_tracker_init();
+-
 -        ksu_ksud_init();
-+#ifdef CONFIG_KSU_SUSFS
-+        susfs_init();
-+#endif // #ifdef CONFIG_KSU_SUSFS
+-
+-        ksu_file_wrapper_init();
+-    }
++    ksu_file_wrapper_init();
  
-         ksu_file_wrapper_init();
-     }
-@@ -152,9 +167,6 @@ int __init kernelsu_init(void)
+ #ifdef MODULE
+ #ifndef CONFIG_KSU_DEBUG
+@@ -152,13 +121,9 @@ int __init kernelsu_init(void)
  extern void ksu_observer_exit(void);
  void kernelsu_exit(void)
  {
@@ -292,9 +327,25 @@ index 2d86038f..f1b28528 100644
 -
      ksu_supercalls_exit();
  
-     if (!ksu_late_loaded)
+-    if (!ksu_late_loaded)
+-        ksu_ksud_exit();
++    ksu_ksud_exit();
+ 
+     // Wait for any in-flight RCU readers (e.g. handler traversing allow_list)
+     synchronize_rcu();
+diff --git a/kernel/ksu.h b/kernel/ksu.h
+index 94c5e3dc..d37c9cb0 100644
+--- a/kernel/ksu.h
++++ b/kernel/ksu.h
+@@ -26,6 +26,5 @@ static inline int endswith(const char *s, const char *t)
+ }
+ 
+ extern struct cred *ksu_cred;
+-extern bool ksu_late_loaded;
+ 
+ #endif
 diff --git a/kernel/ksud.c b/kernel/ksud.c
-index f09903dd..b3778289 100644
+index f09903dd..85c02851 100644
 --- a/kernel/ksud.c
 +++ b/kernel/ksud.c
 @@ -30,6 +30,12 @@
@@ -424,7 +475,18 @@ index f09903dd..b3778289 100644
      if (*type == EV_KEY && *code == KEY_VOLUMEDOWN) {
          int val = *value;
          pr_info("KEY_VOLUMEDOWN val: %d\n", val);
-@@ -448,117 +472,33 @@ bool ksu_is_safe_mode()
+@@ -430,10 +454,6 @@ bool ksu_is_safe_mode()
+         return true;
+     }
+ 
+-    if (ksu_late_loaded) {
+-        return false;
+-    }
+-
+     // stop hook first!
+     stop_input_hook();
+ 
+@@ -448,117 +468,33 @@ bool ksu_is_safe_mode()
      return false;
  }
  
@@ -508,7 +570,7 @@ index f09903dd..b3778289 100644
 -            pr_err("read statbuf 0x%lx failed", (unsigned long)st_size_ptr);
 -        }
 -    }
--
+ 
 -    return ret;
 -}
 -
@@ -520,7 +582,7 @@ index f09903dd..b3778289 100644
 -    int *value = (int *)&PT_REGS_CCALL_PARM4(regs);
 -    return ksu_handle_input_handle_event(type, code, value);
 -}
- 
+-
 -static struct kprobe input_event_kp = {
 -    .symbol_name = "input_event",
 -    .pre_handler = input_handle_event_handler_pre,
@@ -558,7 +620,7 @@ index f09903dd..b3778289 100644
  }
  
  static void stop_input_hook()
-@@ -568,30 +508,15 @@ static void stop_input_hook()
+@@ -568,30 +504,15 @@ static void stop_input_hook()
          return;
      }
      input_hook_stopped = true;
@@ -1133,7 +1195,7 @@ index b8d26982..cdac225d 100644
                                 void *__never_use_argv, void *__never_use_envp,
                                 int *__never_use_flags);
 diff --git a/kernel/supercalls.c b/kernel/supercalls.c
-index c4b47fde..428858a3 100644
+index c4b47fde..b2cd0dac 100644
 --- a/kernel/supercalls.c
 +++ b/kernel/supercalls.c
 @@ -12,6 +12,10 @@
@@ -1147,17 +1209,50 @@ index c4b47fde..428858a3 100644
  
  #include "supercalls.h"
  #include "arch.h"
-@@ -122,6 +126,9 @@ static int do_report_event(void __user *arg)
-             } else {
-                 pr_info("boot_complete triggered\n");
-                 on_boot_completed();
-+#ifdef CONFIG_KSU_SUSFS
-+                susfs_start_sdcard_monitor_fn();
-+#endif // #ifdef CONFIG_KSU_SUSFS
-             }
+@@ -75,9 +79,6 @@ static int do_get_info(void __user *arg)
+     if (is_manager()) {
+         cmd.flags |= KSU_GET_INFO_FLAG_MANAGER;
+     }
+-    if (ksu_late_loaded) {
+-        cmd.flags |= KSU_GET_INFO_FLAG_LATE_LOAD;
+-    }
+ #ifdef EXPECTED_SIZE2
+     cmd.flags |= KSU_GET_INFO_FLAG_PR_BUILD;
+ #endif
+@@ -104,12 +105,8 @@ static int do_report_event(void __user *arg)
+         static bool post_fs_data_lock = false;
+         if (!post_fs_data_lock) {
+             post_fs_data_lock = true;
+-            if (ksu_late_loaded) {
+-                pr_info("post-fs-data skipped (late load)\n");
+-            } else {
+-                pr_info("post-fs-data triggered\n");
+-                on_post_fs_data();
+-            }
++            pr_info("post-fs-data triggered\n");
++            on_post_fs_data();
          }
          break;
-@@ -357,7 +364,6 @@ static int do_set_app_profile(void __user *arg)
+     }
+@@ -117,12 +114,11 @@ static int do_report_event(void __user *arg)
+         static bool boot_complete_lock = false;
+         if (!boot_complete_lock) {
+             boot_complete_lock = true;
+-            if (ksu_late_loaded) {
+-                pr_info("boot_complete skipped (late load)\n");
+-            } else {
+-                pr_info("boot_complete triggered\n");
+-                on_boot_completed();
+-            }
++            pr_info("boot_complete triggered\n");
++            on_boot_completed();
++#ifdef CONFIG_KSU_SUSFS
++            susfs_start_sdcard_monitor_fn();
++#endif // #ifdef CONFIG_KSU_SUSFS
+         }
+         break;
+     }
+@@ -357,7 +353,6 @@ static int do_set_app_profile(void __user *arg)
      ret = ksu_set_app_profile(&cmd.profile);
      if (!ret) {
          ksu_persistent_allow_list();
@@ -1165,7 +1260,7 @@ index c4b47fde..428858a3 100644
      }
      return ret;
  }
-@@ -435,44 +441,29 @@ static int do_manage_mark(void __user *arg)
+@@ -435,44 +430,29 @@ static int do_manage_mark(void __user *arg)
  
      switch (cmd.operation) {
      case KSU_MARK_GET: {
@@ -1220,7 +1315,7 @@ index c4b47fde..428858a3 100644
          break;
      }
      default: {
-@@ -759,40 +750,114 @@ static void ksu_install_fd_tw_func(struct callback_head *cb)
+@@ -759,40 +739,114 @@ static void ksu_install_fd_tw_func(struct callback_head *cb)
      kfree(tw);
  }
  
@@ -1350,7 +1445,7 @@ index c4b47fde..428858a3 100644
  void ksu_supercalls_init(void)
  {
      int i;
-@@ -802,28 +867,10 @@ void ksu_supercalls_init(void)
+@@ -802,28 +856,10 @@ void ksu_supercalls_init(void)
          pr_info("  %-18s = 0x%08x\n", ksu_ioctl_handlers[i].name,
                  ksu_ioctl_handlers[i].cmd);
      }
