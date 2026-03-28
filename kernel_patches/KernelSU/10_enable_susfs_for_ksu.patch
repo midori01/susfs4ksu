@@ -1,10 +1,12 @@
 diff --git a/kernel/Kbuild b/kernel/Kbuild
-index 5212f419..f37ba8a8 100644
+index 5212f419..01d3382d 100644
 --- a/kernel/Kbuild
 +++ b/kernel/Kbuild
-@@ -5,16 +5,6 @@ kernelsu-objs += feature/sucompat.o
+@@ -3,18 +3,7 @@ kernelsu-objs := core/init.o
+ kernelsu-objs += feature/kernel_umount.o
+ kernelsu-objs += feature/sucompat.o
  
- kernelsu-objs += hook/lsm_hook.o
+-kernelsu-objs += hook/lsm_hook.o
  kernelsu-objs += hook/setuid_hook.o
 -kernelsu-objs += hook/syscall_event_bridge.o
 -kernelsu-objs += hook/syscall_hook_manager.o
