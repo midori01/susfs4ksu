@@ -340,7 +340,7 @@ index 00793a9a..74b81ab0 100644
      pr_info("handle umount for uid: %d, pid: %d\n", new_uid, current->pid);
  
 diff --git a/kernel/feature/sucompat.c b/kernel/feature/sucompat.c
-index c96719da..9356d889 100644
+index c96719da..fbc6e03c 100644
 --- a/kernel/feature/sucompat.c
 +++ b/kernel/feature/sucompat.c
 @@ -11,6 +11,11 @@
@@ -371,32 +371,54 @@ index c96719da..9356d889 100644
  bool ksu_su_compat_enabled __read_mostly = true;
  
  static int su_compat_feature_get(u64 *value)
-@@ -71,112 +81,180 @@ static char __user *ksud_user_path(void)
+@@ -71,112 +81,192 @@ static char __user *ksud_user_path(void)
      return userspace_stack_buffer(ksud_path, sizeof(ksud_path));
  }
  
 -int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode, int *__unused_flags)
-+static const char __user *const __user* get_user_argv_ptr_ptr(struct user_arg_ptr argv)
++static const char __user *get_user_arg_ptr(struct user_arg_ptr argv, int nr)
  {
 -    const char su[] = SU_PATH;
-+#ifdef CONFIG_COMPAT
-+	if (unlikely(argv.is_compat))
-+		return argv.ptr.compat;
-+#endif
-+	return argv.ptr.native;
-+}
++	const char __user *native;
  
 -    if (!ksu_is_allow_uid_for_current(current_uid().val)) {
 -        return 0;
+-    }
++#ifdef CONFIG_COMPAT
++	if (unlikely(argv.is_compat)) {
++		compat_uptr_t compat;
+ 
+-    char path[sizeof(su) + 1];
+-    memset(path, 0, sizeof(path));
+-    strncpy_from_user_nofault(path, *filename_user, sizeof(path));
++		if (get_user(compat, argv.ptr.compat + nr))
++			return ERR_PTR(-EFAULT);
+ 
+-    if (unlikely(!memcmp(path, su, sizeof(su)))) {
+-        pr_info("faccessat su->sh!\n");
+-        *filename_user = sh_user_path();
+-    }
++		return compat_ptr(compat);
++	}
++#endif
+ 
+-    return 0;
++	if (get_user(native, argv.ptr.native + nr))
++		return ERR_PTR(-EFAULT);
++
++	return native;
+ }
+ 
+-int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags)
 +/*
 + * return 0 -> No further checks should be required afterwards
 + * return non-zero -> Further checks should be continued afterwards
 + */
-+int ksu_handle_execveat_init(struct filename *filename, struct user_arg_ptr *argv) {
++int ksu_handle_execveat_init(struct filename *filename, struct user_arg_ptr *argv_user) {
 +    if (current->pid != 1 && is_init(get_current_cred())) {
 +        if (unlikely(strcmp(filename->name, KSUD_PATH) == 0)) {
 +            char tmp_filename[SUSFS_MAX_LEN_PATHNAME] = {0};
-+            const char __user *const __user* argv_user = get_user_argv_ptr_ptr(*argv);
++            const char __user *argv_user_ptr = get_user_arg_ptr(*argv_user, 0);
 +            struct ksu_sulog_pending_event *pending_sucompat = NULL;
 +            int ret;
 +
@@ -406,8 +428,8 @@ index c96719da..9356d889 100644
 +                pr_err("escape_to_root_for_init() failed: %d\n", ret);
 +                return ret;
 +            }
-+            if (!argv_user || IS_ERR(argv_user)) {
-+                pr_err("!argv_user || IS_ERR(argv_user)\n");
++            if (!argv_user_ptr || IS_ERR(argv_user_ptr)) {
++                pr_err("!argv_user_ptr || IS_ERR(argv_user_ptr)\n");
 +                return -EFAULT;
 +            }
 +            strncpy(tmp_filename, filename->name, SUSFS_MAX_LEN_PATHNAME - 1);
@@ -423,35 +445,34 @@ index c96719da..9356d889 100644
 +            return 0;
 +        }
 +        return -EINVAL;
-     }
++    }
 +    return -EINVAL;
 +}
- 
--    char path[sizeof(su) + 1];
--    memset(path, 0, sizeof(path));
--    strncpy_from_user_nofault(path, *filename_user, sizeof(path));
++
 +// the call from execve_handler_pre won't provided correct value for __never_use_argument, use them after fix execve_handler_pre, keeping them for consistence for manually patched code
 +int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr,
-+                 void *argv, void *__never_use_envp,
++                 void *argv_user, void *__never_use_envp,
 +                 int *__never_use_flags)
-+{
+ {
+-    // const char sh[] = SH_PATH;
+-    const char su[] = SU_PATH;
 +    struct filename *filename;
 +    char tmp_filename[SUSFS_MAX_LEN_PATHNAME] = {0};
-+    const char __user *const __user* argv_user = get_user_argv_ptr_ptr(*((struct user_arg_ptr*)argv));
++    const char __user *argv_user_ptr = get_user_arg_ptr(*((struct user_arg_ptr*)argv_user), 0);
 +    struct ksu_sulog_pending_event *pending_sucompat = NULL;
 +    int ret;
  
--    if (unlikely(!memcmp(path, su, sizeof(su)))) {
--        pr_info("faccessat su->sh!\n");
--        *filename_user = sh_user_path();
+-    if (!ksu_is_allow_uid_for_current(current_uid().val)) {
 +    if (unlikely(!filename_ptr))
 +        return 0;
 +
 +    filename = *filename_ptr;
 +    if (IS_ERR(filename))
-+        return 0;
-+
-+    if (!ksu_handle_execveat_init(filename, argv))
+         return 0;
+-    }
+ 
+-    if (unlikely(!filename_user)) {
++    if (!ksu_handle_execveat_init(filename, (struct user_arg_ptr*)argv_user))
 +        return 0;
 +
 +    if (likely(memcmp(filename->name, su_path, sizeof(su_path))))
@@ -465,48 +486,39 @@ index c96719da..9356d889 100644
 +    if (ret)
 +        pr_err("escape_with_root_profile() failed: %d\n", ret);
 +
-+    if (!argv_user || IS_ERR(argv_user)) {
-+        pr_err("!argv_user || IS_ERR(argv_user)\n");
-+        return 0;
-     }
- 
-+    strncpy(tmp_filename, filename->name, SUSFS_MAX_LEN_PATHNAME - 1);
-+    pending_sucompat = ksu_sulog_capture_sucompat(tmp_filename, argv_user, GFP_KERNEL);
-+    ksu_sulog_emit_pending(pending_sucompat, ret, GFP_KERNEL);
-     return 0;
- }
- 
--int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags)
-+int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv,
-+            void *envp, int *flags)
- {
--    // const char sh[] = SH_PATH;
--    const char su[] = SU_PATH;
--
--    if (!ksu_is_allow_uid_for_current(current_uid().val)) {
-+    if (ksu_handle_execveat_ksud(fd, filename_ptr, argv, envp, flags))
++    if (!argv_user_ptr || IS_ERR(argv_user_ptr)) {
++        pr_err("!argv_user_ptr || IS_ERR(argv_user_ptr)\n");
          return 0;
--    }
- 
--    if (unlikely(!filename_user)) {
--        return 0;
--    }
-+    return ksu_handle_execveat_sucompat(fd, filename_ptr, argv, envp,
-+                        flags);
-+}
+     }
  
 -    char path[sizeof(su) + 1];
 -    memset(path, 0, sizeof(path));
 -    strncpy_from_user_nofault(path, *filename_user, sizeof(path));
++    strncpy(tmp_filename, filename->name, SUSFS_MAX_LEN_PATHNAME - 1);
++    pending_sucompat = ksu_sulog_capture_sucompat(tmp_filename, (struct user_arg_ptr*)argv_user, GFP_KERNEL);
++    ksu_sulog_emit_pending(pending_sucompat, ret, GFP_KERNEL);
++    return 0;
++}
+ 
+-    if (unlikely(!memcmp(path, su, sizeof(su)))) {
+-        pr_info("newfstatat su->sh!\n");
++int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv,
++            void *envp, int *flags)
++{
++    if (ksu_handle_execveat_ksud(fd, filename_ptr, argv, envp, flags))
++        return 0;
++
++    return ksu_handle_execveat_sucompat(fd, filename_ptr, argv, envp,
++                        flags);
++}
++
 +int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode,
 +             int *__unused_flags)
 +{
 +    char path[sizeof(su_path) + 1] = {0};
 +
 +    strncpy_from_user(path, *filename_user, sizeof(path));
- 
--    if (unlikely(!memcmp(path, su, sizeof(su)))) {
--        pr_info("newfstatat su->sh!\n");
++
 +    if (unlikely(!memcmp(path, su_path, sizeof(su_path)))) {
 +        pr_info("ksu_handle_faccessat: su->sh!\n");
          *filename_user = sh_user_path();
@@ -898,7 +910,7 @@ index 62cfaabf..ba238519 100644
 +                             struct user_arg_ptr *envp, int *flags);
  #endif
 diff --git a/kernel/runtime/ksud_integration.c b/kernel/runtime/ksud_integration.c
-index 8d2754b3..ec2d472e 100644
+index 8d2754b3..760ddff1 100644
 --- a/kernel/runtime/ksud_integration.c
 +++ b/kernel/runtime/ksud_integration.c
 @@ -9,7 +9,6 @@
@@ -922,7 +934,7 @@ index 8d2754b3..ec2d472e 100644
  
  // clang-format off
  static const char KERNEL_SU_RC[] =
-@@ -46,24 +47,6 @@ static const char KERNEL_SU_RC[] =
+@@ -46,43 +47,25 @@ static const char KERNEL_SU_RC[] =
      "\n";
  // clang-format on
  
@@ -946,7 +958,36 @@ index 8d2754b3..ec2d472e 100644
 -
  static const char __user *get_user_arg_ptr(struct user_arg_ptr argv, int nr)
  {
-     const char __user *native;
+-    const char __user *native;
++	const char __user *native;
+ 
+ #ifdef CONFIG_COMPAT
+-    if (unlikely(argv.is_compat)) {
+-        compat_uptr_t compat;
++	if (unlikely(argv.is_compat)) {
++		compat_uptr_t compat;
+ 
+-        if (get_user(compat, argv.ptr.compat + nr))
+-            return ERR_PTR(-EFAULT);
++		if (get_user(compat, argv.ptr.compat + nr))
++			return ERR_PTR(-EFAULT);
+ 
+-        return compat_ptr(compat);
+-    }
++		return compat_ptr(compat);
++	}
+ #endif
+ 
+-    if (get_user(native, argv.ptr.native + nr))
+-        return ERR_PTR(-EFAULT);
++	if (get_user(native, argv.ptr.native + nr))
++		return ERR_PTR(-EFAULT);
+ 
+-    return native;
++	return native;
+ }
+ 
+ /*
 @@ -132,7 +115,7 @@ static bool check_argv(struct user_arg_ptr argv, int index, const char *expected
      if (!p || IS_ERR(p))
          goto fail;
@@ -961,7 +1002,7 @@ index 8d2754b3..ec2d472e 100644
  }
  
 -void ksu_handle_execveat_ksud(const char *path, struct user_arg_ptr *argv)
-+extern int ksu_handle_execveat_init(struct filename *filename, struct user_arg_ptr *argv);
++extern int ksu_handle_execveat_init(struct filename *filename, struct user_arg_ptr *argv_user);
 +
 +// IMPORTANT NOTE: the call from execve_handler_pre WON'T provided correct value for envp and flags in GKI version
 +int ksu_handle_execveat_ksud(int *fd, struct filename **filename_ptr,
@@ -1081,8 +1122,7 @@ index 8d2754b3..ec2d472e 100644
  }
  
 -void ksu_execve_hook_ksud(const struct pt_regs *regs)
-+void ksu_handle_vfs_fstat(int fd, loff_t *kstat_size_ptr)
- {
+-{
 -    const char __user **filename_user = (const char **)&PT_REGS_PARM1(regs);
 -    const char __user *const __user *__argv = (const char __user *const __user *)PT_REGS_PARM2(regs);
 -    struct user_arg_ptr argv = { .ptr.native = __argv };
@@ -1109,7 +1149,8 @@ index 8d2754b3..ec2d472e 100644
 -
 -static long (*orig_sys_read)(const struct pt_regs *regs);
 -static long ksu_sys_read(const struct pt_regs *regs)
--{
++void ksu_handle_vfs_fstat(int fd, loff_t *kstat_size_ptr)
+ {
 -    unsigned int fd = PT_REGS_PARM1(regs);
 -    char __user **buf_ptr = (char __user **)&PT_REGS_PARM2(regs);
 -    size_t *count_ptr = (size_t *)&PT_REGS_PARM3(regs);
@@ -1135,7 +1176,7 @@ index 8d2754b3..ec2d472e 100644
 -        }
 -        fput(file);
 -    }
- 
+-
 -    ret = orig_sys_fstat(regs);
 -
 -    if (is_rc) {
@@ -1174,7 +1215,7 @@ index 8d2754b3..ec2d472e 100644
 -{
 -    unregister_kprobe(&input_event_kp);
 -}
--
+ 
 -static void stop_init_rc_hook()
 -{
 -    ksu_syscall_table_unhook(__NR_read);
@@ -1363,10 +1404,66 @@ index 08488da6..9aa0ae48 100644
 +
  #endif
 diff --git a/kernel/sulog/event.c b/kernel/sulog/event.c
-index 7c893ae0..43366bc6 100644
+index 7c893ae0..5df9e44d 100644
 --- a/kernel/sulog/event.c
 +++ b/kernel/sulog/event.c
-@@ -111,6 +111,28 @@ static __u32 ksu_sulog_copy_empty_string(char *dst)
+@@ -20,18 +20,6 @@
+ #define KSU_SULOG_MAX_ARG_CHUNK 256U
+ #define KSU_SULOG_MAX_FILENAME_LEN 256U
+ 
+-struct user_arg_ptr {
+-#ifdef CONFIG_COMPAT
+-    bool is_compat;
+-#endif
+-    union {
+-        const char __user *const __user *native;
+-#ifdef CONFIG_COMPAT
+-        const compat_uptr_t __user *compat;
+-#endif
+-    } ptr;
+-};
+-
+ static struct ksu_event_queue sulog_queue;
+ 
+ struct ksu_sulog_pending_event {
+@@ -62,25 +50,25 @@ static struct user_arg_ptr ksu_sulog_user_argv(const char __user *const __user *
+     return argv;
+ }
+ 
+-static const char __user *ksu_sulog_get_user_arg_ptr(struct user_arg_ptr argv, int nr)
++static const char __user *get_user_arg_ptr(struct user_arg_ptr argv, int nr)
+ {
+-    const char __user *native;
++	const char __user *native;
+ 
+ #ifdef CONFIG_COMPAT
+-    if (unlikely(argv.is_compat)) {
+-        compat_uptr_t compat;
++	if (unlikely(argv.is_compat)) {
++		compat_uptr_t compat;
+ 
+-        if (get_user(compat, argv.ptr.compat + nr))
+-            return ERR_PTR(-EFAULT);
++		if (get_user(compat, argv.ptr.compat + nr))
++			return ERR_PTR(-EFAULT);
+ 
+-        return compat_ptr(compat);
+-    }
++		return compat_ptr(compat);
++	}
+ #endif
+ 
+-    if (get_user(native, argv.ptr.native + nr))
+-        return ERR_PTR(-EFAULT);
++	if (get_user(native, argv.ptr.native + nr))
++		return ERR_PTR(-EFAULT);
+ 
+-    return native;
++	return native;
+ }
+ 
+ static void ksu_sulog_fill_task_info(struct ksu_sulog_event *event, __u16 event_type, int retval)
+@@ -111,6 +99,28 @@ static __u32 ksu_sulog_copy_empty_string(char *dst)
      return 1;
  }
  
@@ -1395,16 +1492,38 @@ index 7c893ae0..43366bc6 100644
  static __u32 ksu_sulog_copy_filename(const char __user *filename_user, char *dst, __u32 dst_len)
  {
      long ret;
-@@ -190,7 +212,7 @@ static __u32 ksu_sulog_flatten_argv(const char __user *const __user *argv_user,
+@@ -133,9 +143,8 @@ static __u32 ksu_sulog_copy_filename(const char __user *filename_user, char *dst
+     return ret + 1;
+ }
+ 
+-static __u32 ksu_sulog_flatten_argv(const char __user *const __user *argv_user, char *dst, __u32 dst_len)
++static __u32 ksu_sulog_flatten_argv(struct user_arg_ptr *argv_user, char *dst, __u32 dst_len)
+ {
+-    struct user_arg_ptr argv = ksu_sulog_user_argv(argv_user);
+     char arg[KSU_SULOG_MAX_ARG_CHUNK];
+     __u32 used = 0;
+     int i;
+@@ -154,7 +163,7 @@ static __u32 ksu_sulog_flatten_argv(const char __user *const __user *argv_user,
+         if (fatal_signal_pending(current))
+             break;
+ 
+-        arg_user = ksu_sulog_get_user_arg_ptr(argv, i);
++        arg_user = get_user_arg_ptr(*argv_user, i);
+         if (!arg_user)
+             break;
+         if (IS_ERR(arg_user))
+@@ -190,8 +199,8 @@ static __u32 ksu_sulog_flatten_argv(const char __user *const __user *argv_user,
      return used + 1;
  }
  
 -static struct ksu_sulog_pending_event *ksu_sulog_capture(__u16 event_type, const char __user *filename_user,
+-                                                         const char __user *const __user *argv_user, gfp_t gfp)
 +static struct ksu_sulog_pending_event *ksu_sulog_capture(__u16 event_type, const char *filename,
-                                                          const char __user *const __user *argv_user, gfp_t gfp)
++                                                         struct user_arg_ptr *argv_user, gfp_t gfp)
  {
      struct ksu_sulog_pending_event *pending = NULL;
-@@ -202,6 +224,7 @@ static struct ksu_sulog_pending_event *ksu_sulog_capture(__u16 event_type, const
+     struct ksu_sulog_event *event;
+@@ -202,6 +211,7 @@ static struct ksu_sulog_pending_event *ksu_sulog_capture(__u16 event_type, const
      __u32 remaining;
      char *filename_buf;
      char *argv_buf;
@@ -1412,7 +1531,7 @@ index 7c893ae0..43366bc6 100644
      if (!ksu_sulog_is_enabled())
          return NULL;
  
-@@ -218,7 +241,7 @@ static struct ksu_sulog_pending_event *ksu_sulog_capture(__u16 event_type, const
+@@ -218,7 +228,7 @@ static struct ksu_sulog_pending_event *ksu_sulog_capture(__u16 event_type, const
  
      remaining = KSU_SULOG_MAX_PAYLOAD_LEN - sizeof(*event);
      filename_buf = (char *)payload + sizeof(*event);
@@ -1421,13 +1540,20 @@ index 7c893ae0..43366bc6 100644
      if (!filename_len)
          goto out_free_payload;
  
-@@ -289,10 +312,10 @@ struct ksu_sulog_pending_event *ksu_sulog_capture_root_execve(const char __user
-     return ksu_sulog_capture(KSU_SULOG_EVENT_ROOT_EXECVE, filename_user, argv_user, gfp);
+@@ -283,16 +293,10 @@ static void ksu_sulog_free_pending(struct ksu_sulog_pending_event *pending)
+     kfree(pending);
  }
  
+-struct ksu_sulog_pending_event *ksu_sulog_capture_root_execve(const char __user *filename_user,
+-                                                              const char __user *const __user *argv_user, gfp_t gfp)
+-{
+-    return ksu_sulog_capture(KSU_SULOG_EVENT_ROOT_EXECVE, filename_user, argv_user, gfp);
+-}
+-
 -struct ksu_sulog_pending_event *ksu_sulog_capture_sucompat(const char __user *filename_user,
+-                                                           const char __user *const __user *argv_user, gfp_t gfp)
 +struct ksu_sulog_pending_event *ksu_sulog_capture_sucompat(const char *filename,
-                                                            const char __user *const __user *argv_user, gfp_t gfp)
++                                                           struct user_arg_ptr *argv_user, gfp_t gfp)
  {
 -    return ksu_sulog_capture(KSU_SULOG_EVENT_SUCOMPAT, filename_user, argv_user, gfp);
 +    return ksu_sulog_capture(KSU_SULOG_EVENT_SUCOMPAT, filename, argv_user, gfp);
@@ -1435,18 +1561,30 @@ index 7c893ae0..43366bc6 100644
  
  void ksu_sulog_emit_pending(struct ksu_sulog_pending_event *pending, int retval, gfp_t gfp)
 diff --git a/kernel/sulog/event.h b/kernel/sulog/event.h
-index 635ec01c..0007bd3f 100644
+index 635ec01c..c7b28b86 100644
 --- a/kernel/sulog/event.h
 +++ b/kernel/sulog/event.h
-@@ -14,7 +14,7 @@ void ksu_sulog_events_exit(void);
+@@ -5,6 +5,7 @@
+ #include <linux/gfp.h>
+ #include <linux/types.h>
+ #include "uapi/sulog.h" // IWYU pragma: keep
++#include "runtime/ksud.h"
  
- struct ksu_sulog_pending_event *ksu_sulog_capture_root_execve(const char __user *filename_user,
-                                                               const char __user *const __user *argv_user, gfp_t gfp);
+ struct ksu_event_queue;
+ struct ksu_sulog_pending_event;
+@@ -12,10 +13,8 @@ struct ksu_sulog_pending_event;
+ int ksu_sulog_events_init(void);
+ void ksu_sulog_events_exit(void);
+ 
+-struct ksu_sulog_pending_event *ksu_sulog_capture_root_execve(const char __user *filename_user,
+-                                                              const char __user *const __user *argv_user, gfp_t gfp);
 -struct ksu_sulog_pending_event *ksu_sulog_capture_sucompat(const char __user *filename_user,
+-                                                           const char __user *const __user *argv_user, gfp_t gfp);
 +struct ksu_sulog_pending_event *ksu_sulog_capture_sucompat(const char *filename,
-                                                            const char __user *const __user *argv_user, gfp_t gfp);
++                                                           struct user_arg_ptr *argv_user, gfp_t gfp);
  void ksu_sulog_emit_pending(struct ksu_sulog_pending_event *pending, int retval, gfp_t gfp);
  int ksu_sulog_emit_grant_root(int retval, __u32 uid, __u32 euid, gfp_t gfp);
+ 
 diff --git a/kernel/supercall/dispatch.c b/kernel/supercall/dispatch.c
 index 368c0203..1c774bbc 100644
 --- a/kernel/supercall/dispatch.c
