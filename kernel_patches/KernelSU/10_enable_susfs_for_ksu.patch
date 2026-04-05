@@ -1,5 +1,5 @@
 diff --git a/kernel/Kbuild b/kernel/Kbuild
-index 779a52f7..55d4838e 100644
+index d4a07c97..18ce2e65 100644
 --- a/kernel/Kbuild
 +++ b/kernel/Kbuild
 @@ -4,18 +4,7 @@ kernelsu-objs += feature/kernel_umount.o
@@ -21,21 +21,6 @@ index 779a52f7..55d4838e 100644
  
  kernelsu-objs += infra/file_wrapper.o
  kernelsu-objs += infra/event_queue.o
-@@ -64,11 +53,9 @@ endif
- ccflags-y += -I$(srctree)/security/selinux -I$(srctree)/security/selinux/include
- ccflags-y += -I$(objtree)/security/selinux -include $(srctree)/include/uapi/asm-generic/errno.h
- 
--ifdef KBUILD_EXTMOD
--ccflags-y += -I$(src) -I$(src)/include
--else
--ccflags-y += -I$(srctree)/$(src) -I$(srctree)/$(src)/include
--endif
-+## As we are building gki only, no KBUILD_EXTMOD is needed
-+## Since there is still a build error for 6.12 as $(src) returns absolute path, so here we just hardcode it
-+ccflags-y += -I$(srctree)/drivers/kernelsu -I$(srctree)/drivers/kernelsu/include
- 
- obj-$(CONFIG_KSU) += kernelsu.o
- 
 diff --git a/kernel/Kconfig b/kernel/Kconfig
 index c7701661..5c169f59 100644
 --- a/kernel/Kconfig
@@ -334,10 +319,10 @@ index abf3eb8d..555e22ec 100644
  
      if (ksu_cred) {
 diff --git a/kernel/feature/adb_root.c b/kernel/feature/adb_root.c
-index 403c7c39..f028523d 100644
+index 98990673..d8c1c074 100644
 --- a/kernel/feature/adb_root.c
 +++ b/kernel/feature/adb_root.c
-@@ -10,9 +10,12 @@
+@@ -9,9 +9,12 @@
  #include <linux/ptrace.h>
  #include <linux/static_key.h>
  #include <linux/slab.h>
@@ -350,7 +335,7 @@ index 403c7c39..f028523d 100644
  #include "policy/feature.h"
  #include "selinux/selinux.h"
  
-@@ -20,33 +23,16 @@
+@@ -19,33 +22,16 @@
  
  DEFINE_STATIC_KEY_FALSE(ksu_adb_root);
  
@@ -390,7 +375,7 @@ index 403c7c39..f028523d 100644
  {
      static const char kLibAdbRoot[] = "/data/adb/ksu/lib/libadbroot.so";
      struct path path;
-@@ -65,15 +51,16 @@ static long is_libadbroot_ok()
+@@ -64,15 +50,16 @@ static long is_libadbroot_ok()
      return ret;
  }
  
@@ -410,7 +395,7 @@ index 403c7c39..f028523d 100644
      unsigned long *tmp_env_p = NULL, *tmp_env_p2 = NULL;
      size_t env_count = 0, total_size;
      long ret;
-@@ -159,9 +146,9 @@ out_release_env_p:
+@@ -158,9 +145,9 @@ out_release_env_p:
      return ret;
  }
  
@@ -422,7 +407,7 @@ index 403c7c39..f028523d 100644
          return 0;
      }
  
-@@ -169,20 +156,25 @@ static long do_ksu_adb_root_handle_execve(struct pt_regs *regs)
+@@ -168,20 +155,25 @@ static long do_ksu_adb_root_handle_execve(struct pt_regs *regs)
          return 0;
      }
  
