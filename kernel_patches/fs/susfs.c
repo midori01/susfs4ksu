@@ -306,6 +306,7 @@ out_path_put_path:
 void susfs_add_sus_kstat(void __user **user_info) {
 	struct st_susfs_sus_kstat info = {0};
 	struct st_susfs_sus_kstat_hlist *new_entry, *tmp_entry;
+	struct hlist_node *tmp_hlist_node;
 
 	if (copy_from_user(&info, (struct st_susfs_sus_kstat __user*)*user_info, sizeof(info))) {
 		info.err = -EFAULT;
@@ -338,7 +339,7 @@ void susfs_add_sus_kstat(void __user **user_info) {
 
 	// statically or not, check for duplicated entry, and remove it first if so
 	spin_lock(&susfs_spin_lock_sus_kstat);
-	hash_for_each_possible(SUS_KSTAT_HLIST, tmp_entry, node, info.target_ino) {
+	hash_for_each_possible_safe(SUS_KSTAT_HLIST, tmp_entry, tmp_hlist_node, node, info.target_ino) {
 		if (!strcmp(tmp_entry->info.target_pathname, info.target_pathname)) {
 			info.err = susfs_mark_inode_sus_kstat(new_entry->info.target_pathname, new_entry);
 			if (info.err) {
@@ -756,6 +757,7 @@ DEFINE_STATIC_SRCU(susfs_srcu_open_redirect);
 void susfs_add_open_redirect(void __user **user_info) {
 	struct st_susfs_open_redirect info = {0};
 	struct st_susfs_open_redirect_hlist *new_entry_target, *new_entry_redirected, *tmp_entry_target, *tmp_entry_redirected;
+	struct hlist_node *tmp_hlist_node;
 	struct path target_path, redirected_path;
 	struct inode *target_inode, *redirected_inode;
 	bool is_first_dup_found = false;
@@ -847,7 +849,7 @@ void susfs_add_open_redirect(void __user **user_info) {
 
 	// check for existing entries, delete it first if so
 	spin_lock(&susfs_spin_lock_open_redirect);
-	hash_for_each_possible(OPEN_REDIRECT_HLIST, tmp_entry_target, node, target_inode->i_ino) {
+	hash_for_each_possible_safe(OPEN_REDIRECT_HLIST, tmp_entry_target, tmp_hlist_node, node, target_inode->i_ino) {
 		if (!strcmp(tmp_entry_target->info.target_pathname, info.target_pathname)) {
 			if (tmp_entry_target->reversed_lookup_only) {
 				SUSFS_LOGE("duplicated '%s' cannot be removed/added because it is used for reversed lookup only\n", info.target_pathname);
@@ -864,7 +866,7 @@ void susfs_add_open_redirect(void __user **user_info) {
 	}
 
 	if (is_first_dup_found) {
-		hash_for_each_possible(OPEN_REDIRECT_HLIST, tmp_entry_redirected, node, redirected_inode->i_ino) {
+		hash_for_each_possible_safe(OPEN_REDIRECT_HLIST, tmp_entry_redirected, tmp_hlist_node, node, redirected_inode->i_ino) {
 			if (!strcmp(tmp_entry_redirected->info.target_pathname, info.redirected_pathname)) {
 				is_second_dup_found = true;
 				hash_del_rcu(&tmp_entry_redirected->node);
