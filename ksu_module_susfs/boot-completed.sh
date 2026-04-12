@@ -28,6 +28,7 @@ until [ -d "/sdcard/Android" ]; do sleep 3; done
 
 [ -e "/sdcard/..5.u.S" ] && rm -rf "/sdcard/..5.u.S"
 [ -e "/sdcard/Android/data/..5.u.S" ] && rm -rf "/sdcard/Android/data/..5.u.S"
+[ -e "/sdcard/Android/media/..5.u.S" ] && rm -rf "/sdcard/Android/media/..5.u.S"
 
 ## For paths that are read-only all the time, add them via 'add_sus_path' ##
 ${SUSFS_BIN} add_sus_path /sys/block/loop0

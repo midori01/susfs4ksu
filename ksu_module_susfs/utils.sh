@@ -52,18 +52,8 @@ susfs_hexpatch_prop_name() {
 	fi
 }
 
-susfs_revoke_write_external_storage_permission_for_third_party_packages(){
-        TARGET_PERMISSION="android.permission.WRITE_EXTERNAL_STORAGE"
-        pm list packages -3 | cut -d':' -f2 | while read -r PKGNAME; do
-                if pm dump-package ${PKGNAME} | grep -Eq "${TARGET_PERMISSION}"; then
-                        echo "susfs: package '${PKGNAME}' has '${TARGET_PERMISSION}' permission declared, force to revoke it now no matter it is granted or not." | tee /dev/kmsg
-                        pm revoke ${PKGNAME} ${TARGET_PERMISSION}
-                fi
-        done
-}
-
-susfs_check_write_external_storage_permission_for_third_party_packages(){
-        TARGET_PERMISSION="android.permission.WRITE_EXTERNAL_STORAGE"
+susfs_list_full_file_access_for_third_party_apps(){
+        local TARGET_PERMISSION="android.permission.MANAGE_EXTERNAL_STORAGE"
         pm list packages -3 | cut -d':' -f2 | while read -r PKGNAME; do
                 if pm dump-package ${PKGNAME} | grep -Eq "${TARGET_PERMISSION}"; then
                         echo "susfs: package '${PKGNAME}' has '${TARGET_PERMISSION}' permission declared." | tee /dev/kmsg
