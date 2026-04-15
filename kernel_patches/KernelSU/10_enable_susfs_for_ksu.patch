@@ -827,7 +827,7 @@ index 1afba60f..ebee691b 100644
  #endif
 \ No newline at end of file
 diff --git a/kernel/hook/setuid_hook.c b/kernel/hook/setuid_hook.c
-index d3f3ac49..98df2bc0 100644
+index d3f3ac49..4cc158f0 100644
 --- a/kernel/hook/setuid_hook.c
 +++ b/kernel/hook/setuid_hook.c
 @@ -11,6 +11,8 @@
@@ -884,7 +884,7 @@ index d3f3ac49..98df2bc0 100644
 +    // - Since ksu maanger app uid is excluded in allow_list_arr, so ksu_uid_should_umount(manager_uid)
 +    //   will always return true, that's why we need to explicitly check if new_uid belongs to
 +    //   ksu manager
-+    if (is_uid_manager(new_uid)) {
++    if (likely(ksu_is_manager_appid_valid()) && unlikely(is_uid_manager(new_uid))) {
          spin_lock_irq(&current->sighand->siglock);
          ksu_seccomp_allow_cache(current->seccomp.filter, __NR_reboot);
 -        ksu_set_task_tracepoint_flag(current);
@@ -955,14 +955,14 @@ index 17f9b826..be81e626 100644
  
  static inline int startswith(char *s, char *prefix)
 diff --git a/kernel/policy/allowlist.c b/kernel/policy/allowlist.c
-index e7375e5d..0a172220 100644
+index d5eac53f..c1f27f06 100644
 --- a/kernel/policy/allowlist.c
 +++ b/kernel/policy/allowlist.c
-@@ -327,14 +327,6 @@ bool ksu_uid_should_umount(uid_t uid)
- #ifndef CONFIG_KSU_DISABLE_POLICY
-     struct app_profile profile = { .current_uid = uid };
- #endif
--    if (unlikely(is_uid_manager(uid))) {
+@@ -306,14 +306,7 @@ bool ksu_uid_should_umount(uid_t uid)
+ {
+     struct app_profile *profile;
+     bool res;
+-    if (likely(ksu_is_manager_appid_valid()) && unlikely(ksu_get_manager_appid() == uid % PER_USER_RANGE)) {
 -        // we should not umount on manager!
 -        return false;
 -    }
@@ -970,11 +970,12 @@ index e7375e5d..0a172220 100644
 -        // we should not umount for webview zygote
 -        return false;
 -    }
++
  #ifdef CONFIG_KSU_DISABLE_POLICY
      return !__ksu_is_allow_uid(uid);
  #else
 diff --git a/kernel/policy/app_profile.c b/kernel/policy/app_profile.c
-index 88a5b0d5..58f8bc80 100644
+index 1b9f506a..4036dff7 100644
 --- a/kernel/policy/app_profile.c
 +++ b/kernel/policy/app_profile.c
 @@ -14,7 +14,6 @@
@@ -991,7 +992,7 @@ index 88a5b0d5..58f8bc80 100644
      struct cred *cred;
 -    struct task_struct *p = current;
 -    struct task_struct *t;
-     struct root_profile profile;
+     struct root_profile *profile = NULL;
      struct user_struct *new_user;
  
 @@ -117,7 +114,7 @@ int escape_with_root_profile(void)
@@ -1011,10 +1012,10 @@ index 88a5b0d5..58f8bc80 100644
 -        ksu_set_task_tracepoint_flag(t);
 -    }
 -
-     setup_mount_ns(profile.namespaces);
+     setup_mount_ns(profile->namespaces);
+     ksu_put_root_profile(profile);
      return 0;
- 
-@@ -193,14 +186,16 @@ out_abort_creds:
+@@ -196,14 +189,16 @@ out_abort_creds:
      return ret;
  }
  
@@ -1778,7 +1779,7 @@ index 635ec01c..c7b28b86 100644
  int ksu_sulog_emit_grant_root(int retval, __u32 uid, __u32 euid, gfp_t gfp);
  
 diff --git a/kernel/supercall/dispatch.c b/kernel/supercall/dispatch.c
-index 64ad0e02..436892fb 100644
+index 1990b5d1..48c94b53 100644
 --- a/kernel/supercall/dispatch.c
 +++ b/kernel/supercall/dispatch.c
 @@ -3,6 +3,8 @@
@@ -1839,7 +1840,7 @@ index 64ad0e02..436892fb 100644
          }
          break;
      }
-@@ -334,7 +325,6 @@ static int do_set_app_profile(void __user *arg)
+@@ -340,7 +331,6 @@ static int do_set_app_profile(void __user *arg)
      ret = ksu_set_app_profile(&cmd.profile);
      if (!ret) {
          ksu_persistent_allow_list();
@@ -1847,7 +1848,7 @@ index 64ad0e02..436892fb 100644
      }
      return ret;
  }
-@@ -411,49 +401,32 @@ static int do_manage_mark(void __user *arg)
+@@ -417,49 +407,32 @@ static int do_manage_mark(void __user *arg)
      }
  
      switch (cmd.operation) {
@@ -1918,7 +1919,7 @@ index 64ad0e02..436892fb 100644
      }
      if (copy_to_user(arg, &cmd, sizeof(cmd))) {
          pr_err("manage_mark: copy_to_user failed\n");
-@@ -463,6 +436,99 @@ static int do_manage_mark(void __user *arg)
+@@ -469,6 +442,99 @@ static int do_manage_mark(void __user *arg)
      return 0;
  }
  
