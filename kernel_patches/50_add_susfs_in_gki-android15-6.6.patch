@@ -1,6 +1,6 @@
 
 diff --git a/drivers/input/input.c b/drivers/input/input.c
-index 9bb1d3de7..fe0e6e369 100644
+index 9bb1d3de7..a6333655c 100644
 --- a/drivers/input/input.c
 +++ b/drivers/input/input.c
 @@ -391,6 +391,12 @@ static void input_event_dispose(struct input_dev *dev, int disposition,
@@ -8,7 +8,7 @@ index 9bb1d3de7..fe0e6e369 100644
  }
  
 +#ifdef CONFIG_KSU_SUSFS
-+extern struct static_key_false ksu_input_hook_key_false;
++extern struct static_key_true ksu_is_input_hook_enabled;
 +extern __attribute__((cold)) int ksu_handle_input_handle_event(
 +			unsigned int *type, unsigned int *code, int *value);
 +#endif
@@ -21,7 +21,7 @@ index 9bb1d3de7..fe0e6e369 100644
  
  	disposition = input_get_disposition(dev, type, code, &value);
 +#ifdef CONFIG_KSU_SUSFS
-+	if (static_branch_unlikely(&ksu_input_hook_key_false))
++	if (static_branch_unlikely(&ksu_is_input_hook_enabled))
 +		ksu_handle_input_handle_event(&type, &code, &value);
 +#endif
  	if (disposition != INPUT_IGNORE_EVENT) {
@@ -81,7 +81,7 @@ index 299c295a2..d27b3d4e7 100644
  		return NULL;
  	return dentry->d_fsdata;
 diff --git a/fs/exec.c b/fs/exec.c
-index 71bd99ce8..a2b31317e 100644
+index 71bd99ce8..52e172206 100644
 --- a/fs/exec.c
 +++ b/fs/exec.c
 @@ -67,6 +67,9 @@
@@ -100,7 +100,7 @@ index 71bd99ce8..a2b31317e 100644
  
 +#ifdef CONFIG_KSU_SUSFS
 +extern bool ksu_su_compat_enabled __read_mostly;
-+extern struct static_key_false susfs_set_sdcard_android_data_decrypted_key_false;
++extern struct static_key_true susfs_is_sdcard_android_data_not_decrypted;
 +extern bool __ksu_is_allow_uid_for_current(uid_t uid);
 +extern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv,
 +			void *envp, int *flags);
@@ -119,7 +119,7 @@ index 71bd99ce8..a2b31317e 100644
 +	if (likely(susfs_is_current_proc_umounted()) || !ksu_su_compat_enabled)
 +		goto orig_flow;
 +
-+	if (static_branch_unlikely(&susfs_set_sdcard_android_data_decrypted_key_false))
++	if (static_branch_unlikely(&susfs_is_sdcard_android_data_not_decrypted))
 +		ksu_handle_execveat(&fd, &filename, &argv, &envp, &flags);
 +	else
 +		ksu_handle_execveat_sucompat(&fd, &filename, &argv, &envp, &flags);
@@ -449,7 +449,7 @@ index b31b583f1..5703a5a00 100644
  	do_delayed_call(&done);
  	return res;
 diff --git a/fs/namespace.c b/fs/namespace.c
-index 97fc42277..977a6b501 100644
+index 97fc42277..6ca4deb4d 100644
 --- a/fs/namespace.c
 +++ b/fs/namespace.c
 @@ -32,12 +32,26 @@
@@ -467,7 +467,7 @@ index 97fc42277..977a6b501 100644
  
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +extern bool susfs_is_current_ksu_domain(void);
-+extern struct static_key_false susfs_set_sdcard_android_data_decrypted_key_false;
++extern struct static_key_true susfs_is_sdcard_android_data_not_decrypted;
 +
 +#define CL_COPY_MNT_NS BIT(25) /* used by copy_mnt_ns() */
 +
@@ -664,7 +664,7 @@ index 97fc42277..977a6b501 100644
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +	// - We will just stop checking for ksu process if /sdcard/Android is accessible,
 +	//   for the sake of performance
-+	if (static_branch_unlikely(&susfs_set_sdcard_android_data_decrypted_key_false)) {
++	if (static_branch_unlikely(&susfs_is_sdcard_android_data_not_decrypted)) {
 +		if (susfs_is_current_ksu_domain()) {
 +			mnt = susfs_alloc_non_unshare_ksu_vfsmnt(fc->source ?: "none");
 +			goto bypass_orig_flow;
@@ -688,7 +688,7 @@ index 97fc42277..977a6b501 100644
 +
 +	// - We will just stop checking for ksu process if /sdcard/Android is accessible,
 +	//   for the sake of performance
-+	if (static_branch_unlikely(&susfs_set_sdcard_android_data_decrypted_key_false)) {
++	if (static_branch_unlikely(&susfs_is_sdcard_android_data_not_decrypted)) {
 +		// - If /sdcard/Android is still not accessible, we keep checking for mounts
 +		//   mounted by ksu process
 +		if (susfs_is_current_ksu_domain()) {
@@ -1074,7 +1074,7 @@ index 68d01c9ab..7f2ab4033 100644
  			continue;
  
 diff --git a/fs/proc/bootconfig.c b/fs/proc/bootconfig.c
-index 2e244ada1..298a48dbf 100644
+index 2e244ada1..ca76c06d0 100644
 --- a/fs/proc/bootconfig.c
 +++ b/fs/proc/bootconfig.c
 @@ -12,8 +12,21 @@
@@ -1082,14 +1082,14 @@ index 2e244ada1..298a48dbf 100644
  static char *saved_boot_config;
  
 +#ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
-+extern struct static_key_true susfs_set_fake_cmdline_or_bootconfig_key_true;
++extern struct static_key_false susfs_is_fake_cmdline_or_bootconfig_buffer_set;
 +extern void susfs_spoof_cmdline_or_bootconfig(struct seq_file *m);
 +#endif
 +
  static int boot_config_proc_show(struct seq_file *m, void *v)
  {
 +#ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
-+	if (static_branch_likely(&susfs_set_fake_cmdline_or_bootconfig_key_true)) {
++	if (static_branch_likely(&susfs_is_fake_cmdline_or_bootconfig_buffer_set)) {
 +		if (saved_boot_config) {
 +			susfs_spoof_cmdline_or_bootconfig(m);
 +			return 0;
@@ -1454,7 +1454,7 @@ index 250eb5bf7..ec545e8a0 100644
  	if (sb->s_op->show_devname) {
  		seq_puts(m, "device ");
 diff --git a/fs/read_write.c b/fs/read_write.c
-index 066490235..4b4d2f833 100644
+index 066490235..2f4ff91be 100644
 --- a/fs/read_write.c
 +++ b/fs/read_write.c
 @@ -619,8 +619,18 @@ ssize_t ksys_read(unsigned int fd, char __user *buf, size_t count)
@@ -1462,14 +1462,14 @@ index 066490235..4b4d2f833 100644
  }
  
 +#ifdef CONFIG_KSU_SUSFS
-+extern struct static_key_false ksu_init_rc_hook_key_false;
++extern struct static_key_true ksu_is_init_rc_hook_enabled;
 +extern __attribute__((cold)) void ksu_handle_sys_read(unsigned int fd);
 +#endif
 +
  SYSCALL_DEFINE3(read, unsigned int, fd, char __user *, buf, size_t, count)
  {
 +#ifdef CONFIG_KSU_SUSFS
-+	if (static_branch_unlikely(&ksu_init_rc_hook_key_false))
++	if (static_branch_unlikely(&ksu_is_init_rc_hook_enabled))
 +		ksu_handle_sys_read(fd);
 +#endif
 +
@@ -1754,7 +1754,7 @@ index c8c46e294..a18bb8379 100644
  	if (error >= 0)
  		error = buf.error;
 diff --git a/fs/stat.c b/fs/stat.c
-index 517fa4ed8..981fd94e3 100644
+index 517fa4ed8..3791acd2b 100644
 --- a/fs/stat.c
 +++ b/fs/stat.c
 @@ -20,12 +20,23 @@
@@ -1818,7 +1818,7 @@ index 517fa4ed8..981fd94e3 100644
   */
 +
 +#ifdef CONFIG_KSU_SUSFS
-+extern struct static_key_false ksu_init_rc_hook_key_false;
++extern struct static_key_true ksu_is_init_rc_hook_enabled;
 +extern void ksu_handle_vfs_fstat(int fd, loff_t *kstat_size_ptr);
 +#endif // #ifdef CONFIG_KSU_SUSFS
 +
@@ -1830,7 +1830,7 @@ index 517fa4ed8..981fd94e3 100644
  		return -EBADF;
  	error = vfs_getattr(&f.file->f_path, stat, STATX_BASIC_STATS, 0);
 +#ifdef CONFIG_KSU_SUSFS
-+	if (static_branch_unlikely(&ksu_init_rc_hook_key_false))
++	if (static_branch_unlikely(&ksu_is_init_rc_hook_enabled))
 +		ksu_handle_vfs_fstat(fd, &stat->size);
 +#endif // #ifdef CONFIG_KSU_SUSFS
  	fdput(f);
@@ -2038,7 +2038,7 @@ index 344ceaf5e..c2d1a782d 100644
  	if (!ns_capable(pid_ns->user_ns, CAP_SYS_BOOT))
  		return -EPERM;
 diff --git a/kernel/sys.c b/kernel/sys.c
-index c6b0141e4..0f8e70da7 100644
+index c6b0141e4..5a9bf1c58 100644
 --- a/kernel/sys.c
 +++ b/kernel/sys.c
 @@ -661,6 +661,9 @@ SYSCALL_DEFINE1(setuid, uid_t, uid)
@@ -2067,7 +2067,7 @@ index c6b0141e4..0f8e70da7 100644
  }
  
 +#ifdef CONFIG_KSU_SUSFS_SPOOF_UNAME
-+extern struct static_key_true susfs_set_uname_key_true;
++extern struct static_key_false susfs_is_uname_spoof_buffer_set;
 +extern void susfs_spoof_uname(struct new_utsname* tmp);
 +#endif
  SYSCALL_DEFINE1(newuname, struct new_utsname __user *, name)
@@ -2077,14 +2077,14 @@ index c6b0141e4..0f8e70da7 100644
  	down_read(&uts_sem);
  	memcpy(&tmp, utsname(), sizeof(tmp));
 +#ifdef CONFIG_KSU_SUSFS_SPOOF_UNAME
-+	if (static_branch_likely(&susfs_set_uname_key_true))
++	if (static_branch_likely(&susfs_is_uname_spoof_buffer_set))
 +		susfs_spoof_uname(&tmp);
 +#endif
  	up_read(&uts_sem);
  	if (copy_to_user(name, &tmp, sizeof(tmp)))
  		return -EFAULT;
 diff --git a/security/selinux/avc.c b/security/selinux/avc.c
-index 8e40b0941..cd8b1334a 100644
+index 8e40b0941..629658620 100644
 --- a/security/selinux/avc.c
 +++ b/security/selinux/avc.c
 @@ -48,6 +48,12 @@
@@ -2094,7 +2094,7 @@ index 8e40b0941..cd8b1334a 100644
 +#ifdef CONFIG_KSU_SUSFS
 +extern u32 susfs_ksu_sid;
 +extern u32 susfs_priv_app_sid;
-+extern struct static_key_true susfs_avc_log_spoofing_key_true;
++extern struct static_key_false susfs_is_avc_log_spoofing_enabled;
 +#endif
 +
  struct avc_entry {
@@ -2105,7 +2105,7 @@ index 8e40b0941..cd8b1334a 100644
  	rc = security_sid_to_context(sad->tsid, &tcontext,
  				     &tcontext_len);
 +#ifdef CONFIG_KSU_SUSFS
-+	if (static_branch_likely(&susfs_avc_log_spoofing_key_true)) {
++	if (static_branch_likely(&susfs_is_avc_log_spoofing_enabled)) {
 +		if (unlikely(sad->tsid == susfs_ksu_sid)) {
 +			if (rc)
 +				audit_log_format(ab, " tsid=%d", susfs_priv_app_sid);
