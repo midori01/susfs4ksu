@@ -80,7 +80,7 @@ index 4f25015aa..17e9e15af 100644
  		return NULL;
  	return dentry->d_fsdata;
 diff --git a/fs/exec.c b/fs/exec.c
-index a03d486c1..88362e9aa 100644
+index a03d486c1..9c82ec059 100644
 --- a/fs/exec.c
 +++ b/fs/exec.c
 @@ -64,6 +64,9 @@
@@ -98,7 +98,7 @@ index a03d486c1..88362e9aa 100644
  }
  
 +#ifdef CONFIG_KSU_SUSFS
-+extern bool ksu_su_compat_enabled __read_mostly;
++extern struct static_key_true ksu_su_compat_enabled;
 +extern struct static_key_true susfs_is_sdcard_android_data_not_decrypted;
 +extern bool __ksu_is_allow_uid_for_current(uid_t uid);
 +extern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv,
@@ -110,19 +110,20 @@ index a03d486c1..88362e9aa 100644
  static int do_execveat_common(int fd, struct filename *filename,
  			      struct user_arg_ptr argv,
  			      struct user_arg_ptr envp,
-@@ -1953,6 +1966,19 @@ static int do_execveat_common(int fd, struct filename *filename,
+@@ -1953,6 +1966,20 @@ static int do_execveat_common(int fd, struct filename *filename,
  	if (IS_ERR(filename))
  		return PTR_ERR(filename);
  
 +#ifdef CONFIG_KSU_SUSFS
-+	if (likely(susfs_is_current_proc_umounted()) || !ksu_su_compat_enabled) {
++	if (likely(susfs_is_current_proc_umounted()))
 +		goto orig_flow;
-+	}
 +
-+	if (static_branch_unlikely(&susfs_is_sdcard_android_data_not_decrypted))
-+		ksu_handle_execveat(&fd, &filename, &argv, &envp, &flags);
-+	else
-+		ksu_handle_execveat_sucompat(&fd, &filename, &argv, &envp, &flags);
++	if (static_branch_likely(&ksu_su_compat_enabled)) {
++		if (static_branch_unlikely(&susfs_is_sdcard_android_data_not_decrypted))
++			ksu_handle_execveat(&fd, &filename, &argv, &envp, &flags);
++		else
++			ksu_handle_execveat_sucompat(&fd, &filename, &argv, &envp, &flags);
++	}
 +
 +orig_flow:
 +#endif
@@ -898,7 +899,7 @@ index 55081ae3a..8630f2091 100644
  			   inode_mark->wd, inode->i_ino, inode->i_sb->s_dev,
  			   inotify_mark_user_mask(mark));
 diff --git a/fs/open.c b/fs/open.c
-index 0894b354b..b21430e68 100644
+index 0894b354b..4a0c1e788 100644
 --- a/fs/open.c
 +++ b/fs/open.c
 @@ -33,6 +33,9 @@
@@ -916,7 +917,7 @@ index 0894b354b..b21430e68 100644
  }
  
 +#ifdef CONFIG_KSU_SUSFS
-+extern bool ksu_su_compat_enabled __read_mostly;
++extern struct static_key_true ksu_su_compat_enabled;
 +extern bool __ksu_is_allow_uid_for_current(uid_t uid);
 +extern int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode,
 +			int *flags);
@@ -930,12 +931,12 @@ index 0894b354b..b21430e68 100644
  	const struct cred *old_cred = NULL;
  
 +#ifdef CONFIG_KSU_SUSFS
-+	if (likely(susfs_is_current_proc_umounted()) || !ksu_su_compat_enabled) {
++	if (likely(susfs_is_current_proc_umounted()))
 +		goto orig_flow;
-+	}
 +
-+	if (unlikely(__ksu_is_allow_uid_for_current(current_uid().val))) {
-+		ksu_handle_faccessat(&dfd, &filename, &mode, NULL);
++	if (static_branch_likely(&ksu_su_compat_enabled)) {
++		if (unlikely(__ksu_is_allow_uid_for_current(current_uid().val)))
++			ksu_handle_faccessat(&dfd, &filename, &mode, NULL);
 +	}
 +
 +orig_flow:
@@ -1944,7 +1945,7 @@ index c44e1afe1..f62b8da75 100644
  }
  #endif
 diff --git a/fs/stat.c b/fs/stat.c
-index ef50573c7..38b209a1f 100644
+index ef50573c7..696b65a23 100644
 --- a/fs/stat.c
 +++ b/fs/stat.c
 @@ -19,12 +19,23 @@
@@ -2030,7 +2031,7 @@ index ef50573c7..38b209a1f 100644
  }
  
 +#ifdef CONFIG_KSU_SUSFS
-+extern bool ksu_su_compat_enabled __read_mostly;
++extern struct static_key_true ksu_su_compat_enabled;
 +extern bool __ksu_is_allow_uid_for_current(uid_t uid);
 +#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
 +extern int ksu_handle_stat(int *dfd, struct filename **filename, int *flags);
@@ -2047,12 +2048,12 @@ index ef50573c7..38b209a1f 100644
  	int error;
  
 +#ifdef CONFIG_KSU_SUSFS
-+	if (likely(susfs_is_current_proc_umounted()) || !ksu_su_compat_enabled) {
++	if (likely(susfs_is_current_proc_umounted()))
 +		goto orig_flow;
-+	}
 +
-+	if (unlikely(__ksu_is_allow_uid_for_current(current_uid().val))) {
-+		ksu_handle_stat(&dfd, &filename, &flags);
++	if (static_branch_likely(&ksu_su_compat_enabled)) {
++		if (unlikely(__ksu_is_allow_uid_for_current(current_uid().val)))
++			ksu_handle_stat(&dfd, &filename, &flags);
 +	}
 +
 +orig_flow:
