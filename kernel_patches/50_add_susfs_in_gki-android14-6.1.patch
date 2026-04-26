@@ -465,7 +465,7 @@ index 1fa36df7b..ae8826bb3 100644
  	do_delayed_call(&done);
  	return res;
 diff --git a/fs/namespace.c b/fs/namespace.c
-index 67d89ebb5..a341b8877 100644
+index 67d89ebb5..42ae3d001 100644
 --- a/fs/namespace.c
 +++ b/fs/namespace.c
 @@ -32,10 +32,21 @@
@@ -594,7 +594,7 @@ index 67d89ebb5..a341b8877 100644
 +	int res;
 +
 +	if (mnt) {
-+		res = ida_alloc_min(&mnt_id_ida, DEFAULT_KSU_MNT_ID, GFP_KERNEL);;
++		res = ida_alloc_min(&mnt_id_ida, DEFAULT_KSU_MNT_ID, GFP_KERNEL);
 +		if (res < 0)
 +			goto out_free_cache;
 +
