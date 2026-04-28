@@ -870,7 +870,7 @@ index 1afba60f..1d8da95a 100644
  #endif
 \ No newline at end of file
 diff --git a/kernel/hook/setuid_hook.c b/kernel/hook/setuid_hook.c
-index d3f3ac49..26dc08cf 100644
+index d3f3ac49..8b99e75e 100644
 --- a/kernel/hook/setuid_hook.c
 +++ b/kernel/hook/setuid_hook.c
 @@ -11,6 +11,8 @@
@@ -882,7 +882,7 @@ index d3f3ac49..26dc08cf 100644
  
  #include "policy/allowlist.h"
  #include "hook/setuid_hook.h"
-@@ -18,39 +20,69 @@
+@@ -18,39 +20,71 @@
  #include "manager/manager_identity.h"
  #include "infra/seccomp_cache.h"
  #include "supercall/supercall.h"
@@ -925,7 +925,8 @@ index d3f3ac49..26dc08cf 100644
 -        pr_info("install fd for manager: %d\n", new_uid);
 +    // - Since ksu maanger app uid is excluded in allow_list_arr, so ksu_uid_should_umount(manager_uid)
 +    //   will always return true, that's why we need to explicitly check if new_uid belongs to
-+    //   ksu manager
++    //   ksu manager.
++    // - Disable seccomp restriction for KSU manager since running with "su" will disable seccomp anyway
 +    if (likely(ksu_is_manager_appid_valid()) && unlikely(is_uid_manager(ruid))) {
 +        disable_seccomp();
 +        pr_info("install fd for manager: %d\n", ruid);
@@ -951,6 +952,7 @@ index d3f3ac49..26dc08cf 100644
 +    if (likely(is_appuid(ruid) && ksu_uid_should_umount(ruid)))
 +        goto do_umount;
 +
++    // - Disable seccomp restriction for root allowed apps since running with "su" will disable seccomp anyway
 +    if (ksu_is_allow_uid_for_current(ruid))
 +        disable_seccomp();
 +
