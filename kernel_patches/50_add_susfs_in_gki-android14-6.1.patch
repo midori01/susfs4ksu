@@ -971,7 +971,7 @@ index 0894b354b..4a0c1e788 100644
  			put_unused_fd(fd);
  			fd = PTR_ERR(f);
 diff --git a/fs/proc/base.c b/fs/proc/base.c
-index b0ec673a2..38011a812 100644
+index b0ec673a2..26ddfccc7 100644
 --- a/fs/proc/base.c
 +++ b/fs/proc/base.c
 @@ -100,6 +100,10 @@
@@ -980,7 +980,7 @@ index b0ec673a2..38011a812 100644
  #include <linux/dma-buf.h>
 +#if defined(CONFIG_KSU_SUSFS_SUS_MAP) || defined(CONFIG_KSU_SUSFS_OPEN_REDIRECT)
 +#include <linux/susfs_def.h>
-+#endif
++#endif // #if defined(CONFIG_KSU_SUSFS_SUS_MAP) || defined(CONFIG_KSU_SUSFS_OPEN_REDIRECT)
 +
  #include <trace/events/oom.h>
  #include <trace/hooks/sched.h>
@@ -991,7 +991,7 @@ index b0ec673a2..38011a812 100644
  	unsigned int flags;
 +#ifdef CONFIG_KSU_SUSFS_SUS_MAP
 +	struct vm_area_struct *vma;
-+#endif
++#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
  
  	if (!mm)
  		return 0;
@@ -1014,7 +1014,7 @@ index b0ec673a2..38011a812 100644
 +				goto free;
 +			}
 +		}
-+#endif
++#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
  
  		if (write && copy_from_user(page, buf, this_len)) {
  			copied = -EFAULT;
@@ -1054,7 +1054,7 @@ index b0ec673a2..38011a812 100644
  	struct vma_iterator vmi;
 +#ifdef CONFIG_KSU_SUSFS_SUS_MAP
 +	struct inode *inode;
-+#endif
++#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
  
  	genradix_init(&fa);
  
@@ -1066,7 +1066,7 @@ index b0ec673a2..38011a812 100644
 +		inode = file_inode(vma->vm_file);
 +		if (SUSFS_IS_INODE_SUS_MAP(inode))
 +			continue;
-+#endif
++#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
  		if (++pos <= ctx->pos)
  			continue;
  
@@ -1254,7 +1254,7 @@ index 913bef0d2..585fc5607 100644
  	/* show_fd_locks() never deferences files so a stale value is safe */
  	show_fd_locks(m, file, files);
 diff --git a/fs/proc/task_mmu.c b/fs/proc/task_mmu.c
-index 0544c1f58..af632ee34 100644
+index 0544c1f58..c9b99d8d5 100644
 --- a/fs/proc/task_mmu.c
 +++ b/fs/proc/task_mmu.c
 @@ -21,6 +21,9 @@
@@ -1281,7 +1281,7 @@ index 0544c1f58..af632ee34 100644
  static void
  show_map_vma(struct seq_file *m, struct vm_area_struct *vma)
  {
-@@ -427,14 +437,50 @@ show_map_vma(struct seq_file *m, struct vm_area_struct *vma)
+@@ -427,14 +437,36 @@ show_map_vma(struct seq_file *m, struct vm_area_struct *vma)
  	unsigned long start, end;
  	dev_t dev = 0;
  	const char *name = NULL;
@@ -1300,22 +1300,8 @@ index 0544c1f58..af632ee34 100644
 +		}
 +#endif // #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
 +#ifdef CONFIG_KSU_SUSFS_SUS_MAP
-+		if (SUSFS_IS_INODE_SUS_MAP(inode)) {
-+			seq_setwidth(m, 25 + sizeof(void *) * 6 - 1);
-+			seq_put_hex_ll(m, NULL, vma->vm_start, 8);
-+			seq_put_hex_ll(m, "-", vma->vm_end, 8);
-+			seq_putc(m, ' ');
-+			seq_putc(m, '-');
-+			seq_putc(m, '-');
-+			seq_putc(m, '-');
-+			seq_putc(m, 'p');
-+			seq_put_hex_ll(m, " ", pgoff, 8);
-+			seq_put_hex_ll(m, " ", MAJOR(dev), 2);
-+			seq_put_hex_ll(m, ":", MINOR(dev), 2);
-+			seq_put_decimal_ull(m, " ", ino);
-+			seq_putc(m, ' ');
-+			goto done;
-+		}
++		if (SUSFS_IS_INODE_SUS_MAP(inode))
++			return;
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
  		dev = inode->i_sb->s_dev;
  		ino = inode->i_ino;
@@ -1332,7 +1318,7 @@ index 0544c1f58..af632ee34 100644
  	start = vma->vm_start;
  	end = VMA_PAD_START(vma);
  	if (show_vma_header_prefix(m, start, end, flags, pgoff, dev, ino))
-@@ -444,6 +490,17 @@ show_map_vma(struct seq_file *m, struct vm_area_struct *vma)
+@@ -444,6 +476,17 @@ show_map_vma(struct seq_file *m, struct vm_area_struct *vma)
  	 * Print the dentry name for named mappings, and a
  	 * special [heap] marker for the heap:
  	 */
@@ -1350,44 +1336,30 @@ index 0544c1f58..af632ee34 100644
  	if (file) {
  		char *buf;
  		size_t size = seq_get_buf(m, &buf);
-@@ -1060,6 +1117,26 @@ static int show_smap(struct seq_file *m, void *v)
- 	if (!vma_pages(vma))
- 		goto show_pad;
+@@ -1055,6 +1098,14 @@ static int show_smap(struct seq_file *m, void *v)
+ 	struct vm_area_struct *vma = v;
+ 	struct mem_size_stats mss;
  
 +#ifdef CONFIG_KSU_SUSFS_SUS_MAP
 +	if (vma->vm_file) {
 +		struct inode *inode = file_inode(vma->vm_file);
-+		if (SUSFS_IS_INODE_SUS_MAP(inode)) {
-+			show_map_vma(m, vma);
-+			SEQ_PUT_DEC("Size:           ", vma->vm_end - vma->vm_start);
-+			SEQ_PUT_DEC(" kB\nKernelPageSize: ", vma_kernel_pagesize(vma));
-+			SEQ_PUT_DEC(" kB\nMMUPageSize:    ", vma_mmu_pagesize(vma));
-+			seq_puts(m, " kB\n");
-+			__show_smap(m, &mss, false);
-+			seq_printf(m, "THPeligible:    %d\n", 0);
-+			if (arch_pkeys_enabled())
-+					seq_printf(m, "ProtectionKey:  %8u\n", vma_pkey(vma));
-+			seq_puts(m, "VmFlags: mr mw me");
-+			seq_putc(m, '\n');
-+			goto show_pad;
-+		}
++		if (SUSFS_IS_INODE_SUS_MAP(inode))
++			return 0;
 +	}
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
 +
- 	smap_gather_stats(vma, &mss, 0);
+ 	memset(&mss, 0, sizeof(mss));
  
- 	show_map_vma(m, vma);
-@@ -1117,7 +1194,20 @@ static int show_smaps_rollup(struct seq_file *m, void *v)
+ 	if (!vma_pages(vma))
+@@ -1117,7 +1168,18 @@ static int show_smaps_rollup(struct seq_file *m, void *v)
  
  	vma_start = vma->vm_start;
  	do {
 +#ifdef CONFIG_KSU_SUSFS_SUS_MAP
 +		if (vma->vm_file) {
 +			struct inode *inode = file_inode(vma->vm_file);
-+			if (SUSFS_IS_INODE_SUS_MAP(inode)) {
-+				memset(&mss, 0, sizeof(mss));
++			if (SUSFS_IS_INODE_SUS_MAP(inode))
 +				goto bypass_orig_flow;
-+			}
 +		}
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
 +
@@ -1398,7 +1370,7 @@ index 0544c1f58..af632ee34 100644
  		last_vma_end = vma->vm_end;
  
  		/*
-@@ -1868,6 +1958,9 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
+@@ -1868,6 +1930,9 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
  	unsigned long start_vaddr;
  	unsigned long end_vaddr;
  	int ret = 0, copied = 0;
@@ -1408,7 +1380,7 @@ index 0544c1f58..af632ee34 100644
  
  	if (!mm || !mmget_not_zero(mm))
  		goto out;
-@@ -1923,6 +2016,14 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
+@@ -1923,6 +1988,17 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
  		if (ret)
  			goto out_free;
  		ret = walk_page_range(mm, start_vaddr, end, &pagemap_ops, &pm);
@@ -1416,8 +1388,11 @@ index 0544c1f58..af632ee34 100644
 +		vma = find_vma(mm, start_vaddr);
 +		if (vma && vma->vm_file) {
 +			struct inode *inode = file_inode(vma->vm_file);
-+			if (SUSFS_IS_INODE_SUS_MAP(inode))
-+				pm.buffer->pme = 0;
++			if (SUSFS_IS_INODE_SUS_MAP(inode)) {
++				mmap_read_unlock(mm);
++				ret = -EINVAL;
++				goto out_free;
++			}
 +		}
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
  		mmap_read_unlock(mm);
@@ -2267,6 +2242,36 @@ index 7595dc25d..9a704f3ec 100644
  
  	if (copy_to_user(name, &tmp, sizeof(tmp)))
  		return -EFAULT;
+diff --git a/mm/madvise.c b/mm/madvise.c
+index 2ae2c3cc3..a2e2b1599 100644
+--- a/mm/madvise.c
++++ b/mm/madvise.c
+@@ -33,7 +33,9 @@
+ #include <linux/shmem_fs.h>
+ #include <linux/mmu_notifier.h>
+ #include <trace/hooks/mm.h>
+-
++#ifdef CONFIG_KSU_SUSFS_SUS_MAP
++#include <linux/susfs_def.h>
++#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
+ #include <asm/tlb.h>
+ 
+ #include "internal.h"
+@@ -1291,6 +1293,14 @@ int madvise_walk_vmas(struct mm_struct *mm, unsigned long start,
+ 		if (!vma)
+ 			return -ENOMEM;
+ 
++#ifdef CONFIG_KSU_SUSFS_SUS_MAP
++		if (vma->vm_file) {
++			struct inode *inode = file_inode(vma->vm_file);
++			if (SUSFS_IS_INODE_SUS_MAP(inode))
++				return -ENOMEM;
++		}
++#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
++
+ 		/* Here start < (end|vma->vm_end). */
+ 		if (start < vma->vm_start) {
+ 			unmapped_error = -ENOMEM;
 diff --git a/security/selinux/avc.c b/security/selinux/avc.c
 index d93af9249..1007387e0 100644
 --- a/security/selinux/avc.c
