@@ -40,46 +40,6 @@ index c6963a9a4..e27ac368b 100644
  obj-$(CONFIG_BUFFER_HEAD)	+= buffer.o mpage.o
  obj-$(CONFIG_PROC_FS)		+= proc_namespace.o
  obj-$(CONFIG_LEGACY_DIRECT_IO)	+= direct-io.o
-diff --git a/fs/devpts/inode.c b/fs/devpts/inode.c
-index 299c295a2..d27b3d4e7 100644
---- a/fs/devpts/inode.c
-+++ b/fs/devpts/inode.c
-@@ -24,6 +24,9 @@
- #include <linux/parser.h>
- #include <linux/fsnotify.h>
- #include <linux/seq_file.h>
-+#ifdef CONFIG_KSU_SUSFS
-+#include <linux/susfs_def.h>
-+#endif
- 
- #define DEVPTS_DEFAULT_MODE 0600
- /*
-@@ -578,6 +581,10 @@ struct dentry *devpts_pty_new(struct pts_fs_info *fsi, int index, void *priv)
- 	return dentry;
- }
- 
-+#ifdef CONFIG_KSU_SUSFS
-+extern int ksu_handle_devpts(struct inode*);
-+#endif
-+
- /**
-  * devpts_get_priv -- get private data for a slave
-  * @dentry: dentry of the slave
-@@ -586,6 +593,14 @@ struct dentry *devpts_pty_new(struct pts_fs_info *fsi, int index, void *priv)
-  */
- void *devpts_get_priv(struct dentry *dentry)
- {
-+#ifdef CONFIG_KSU_SUSFS
-+	if (likely(susfs_is_current_proc_umounted())) {
-+		goto orig_flow;
-+	}
-+	ksu_handle_devpts(dentry->d_inode);
-+orig_flow:
-+#endif
-+
- 	if (dentry->d_sb->s_magic != DEVPTS_SUPER_MAGIC)
- 		return NULL;
- 	return dentry->d_fsdata;
 diff --git a/fs/exec.c b/fs/exec.c
 index 71bd99ce8..d9ef35881 100644
 --- a/fs/exec.c
