@@ -1170,7 +1170,7 @@ index 913bef0d2..585fc5607 100644
  	/* show_fd_locks() never deferences files so a stale value is safe */
  	show_fd_locks(m, file, files);
 diff --git a/fs/proc/task_mmu.c b/fs/proc/task_mmu.c
-index 0544c1f58..17a198781 100644
+index 0544c1f58..f202b6e36 100644
 --- a/fs/proc/task_mmu.c
 +++ b/fs/proc/task_mmu.c
 @@ -21,6 +21,9 @@
@@ -1296,6 +1296,32 @@ index 0544c1f58..17a198781 100644
  		}
  		/* Case 2 above */
  	} while ((vma = mas_find(&mas, ULONG_MAX)) != NULL);
+@@ -1913,6 +1977,9 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
+ 	while (count && (start_vaddr < end_vaddr)) {
+ 		int len;
+ 		unsigned long end;
++#ifdef CONFIG_KSU_SUSFS_SUS_MAP
++		struct vm_area_struct *vma;
++#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
+ 
+ 		pm.pos = 0;
+ 		end = (start_vaddr + PAGEMAP_WALK_SIZE) & PAGEMAP_WALK_MASK;
+@@ -1922,7 +1989,15 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
+ 		ret = mmap_read_lock_killable(mm);
+ 		if (ret)
+ 			goto out_free;
++#ifdef CONFIG_KSU_SUSFS_SUS_MAP
++		vma = vma_lookup(mm, start_vaddr);
++		if (vma && vma->vm_file && SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file)))
++			goto bypass_orig_flow;
++#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
+ 		ret = walk_page_range(mm, start_vaddr, end, &pagemap_ops, &pm);
++#ifdef CONFIG_KSU_SUSFS_SUS_MAP
++bypass_orig_flow:
++#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
+ 		mmap_read_unlock(mm);
+ 		start_vaddr = end;
+ 
 diff --git a/fs/proc_namespace.c b/fs/proc_namespace.c
 index 846f9455a..0184e57eb 100644
 --- a/fs/proc_namespace.c
@@ -2166,34 +2192,6 @@ index 58cd1a431..0be8de3f1 100644
  		ret = get_user_pages_remote(mm, addr, 1,
  				gup_flags, &page, &vma, NULL);
  		if (ret <= 0) {
-diff --git a/mm/pagewalk.c b/mm/pagewalk.c
-index c14e5f1fd..c3414a2d8 100644
---- a/mm/pagewalk.c
-+++ b/mm/pagewalk.c
-@@ -3,6 +3,9 @@
- #include <linux/highmem.h>
- #include <linux/sched.h>
- #include <linux/hugetlb.h>
-+#ifdef CONFIG_KSU_SUSFS_SUS_MAP
-+#include <linux/susfs_def.h>
-+#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
- 
- /*
-  * We want to know the real level where a entry is located ignoring any
-@@ -474,6 +477,13 @@ int walk_page_range(struct mm_struct *mm, unsigned long start,
- 
- 	vma = find_vma(walk.mm, start);
- 	do {
-+#ifdef CONFIG_KSU_SUSFS_SUS_MAP
-+		if (vma && vma->vm_file && SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file)))
-+		{
-+			walk.vma = NULL;
-+			return 0; // basically all pte_hole will just returns 0;
-+		}
-+#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
- 		if (!vma) { /* after the last vma */
- 			walk.vma = NULL;
- 			next = end;
 diff --git a/security/selinux/avc.c b/security/selinux/avc.c
 index d93af9249..1007387e0 100644
 --- a/security/selinux/avc.c
