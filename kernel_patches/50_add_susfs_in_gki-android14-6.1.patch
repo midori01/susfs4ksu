@@ -2235,3 +2235,53 @@ index d93af9249..1007387e0 100644
  	tclass = secclass_map[sad->tclass-1].name;
  	audit_log_format(ab, " tclass=%s", tclass);
  
+diff --git a/security/selinux/selinuxfs.c b/security/selinux/selinuxfs.c
+index 755325a94..05e5422b9 100644
+--- a/security/selinux/selinuxfs.c
++++ b/security/selinux/selinuxfs.c
+@@ -31,6 +31,9 @@
+ #include <linux/uaccess.h>
+ #include <linux/kobject.h>
+ #include <linux/ctype.h>
++#ifdef CONFIG_KSU_SUSFS
++#include <linux/susfs_def.h>
++#endif // #ifdef CONFIG_KSU_SUSFS
+ 
+ /* selinuxfs pseudo filesystem for exporting the security policy API.
+    Based on the proc code and the fs/nfsd/nfsctl.c code. */
+@@ -43,6 +46,11 @@
+ #include "conditional.h"
+ #include "ima.h"
+ 
++#ifdef CONFIG_KSU_SUSFS
++extern u32 ksu_file_sid __read_mostly;
++extern u32 susfs_ksu_sid __read_mostly;
++#endif // #ifdef CONFIG_KSU_SUSFS
++
+ enum sel_inos {
+ 	SEL_ROOT_INO = 2,
+ 	SEL_LOAD,	/* load policy */
+@@ -681,7 +689,11 @@ static ssize_t sel_write_context(struct file *file, char *buf, size_t size)
+ 	struct selinux_fs_info *fsi = file_inode(file)->i_sb->s_fs_info;
+ 	struct selinux_state *state = fsi->state;
+ 	char *canon = NULL;
++#ifdef CONFIG_KSU_SUSFS
++	u32 sid = 0, len;
++#else
+ 	u32 sid, len;
++#endif // #ifdef CONFIG_KSU_SUSFS
+ 	ssize_t length;
+ 
+ 	length = avc_has_perm(&selinux_state,
+@@ -691,6 +703,11 @@ static ssize_t sel_write_context(struct file *file, char *buf, size_t size)
+ 		goto out;
+ 
+ 	length = security_context_to_sid(state, buf, size, &sid, GFP_KERNEL);
++#ifdef CONFIG_KSU_SUSFS
++	if (likely(susfs_is_current_proc_umounted_app() &&
++		(sid == ksu_file_sid || sid == susfs_ksu_sid)))
++		return -EINVAL;
++#endif // #ifdef CONFIG_KSU_SUSFS
+ 	if (length)
+ 		goto out;
+ 
