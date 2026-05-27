@@ -2307,7 +2307,7 @@ index 957fccb73..1a519927b 100644
  	LSM_HOOK_INIT(ismaclabel, selinux_ismaclabel),
  	LSM_HOOK_INIT(secctx_to_secid, selinux_secctx_to_secid),
 diff --git a/security/selinux/selinuxfs.c b/security/selinux/selinuxfs.c
-index 755325a94..f565edcc8 100644
+index 755325a94..396cafeb3 100644
 --- a/security/selinux/selinuxfs.c
 +++ b/security/selinux/selinuxfs.c
 @@ -43,6 +43,15 @@
@@ -2331,7 +2331,7 @@ index 755325a94..f565edcc8 100644
  }
  
 +#ifdef CONFIG_KSU_SUSFS
-+int my_sel_open_handle_status(struct inode *inode, struct file *filp)
++static int my_sel_open_handle_status(struct inode *inode, struct file *filp)
 +{
 +	void *data;
 +	int ret;
