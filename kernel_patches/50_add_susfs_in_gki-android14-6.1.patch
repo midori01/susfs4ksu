@@ -92,7 +92,7 @@ index a03d486c1..9c82ec059 100644
  	 * We move the actual failure in case of RLIMIT_NPROC excess from
  	 * set*uid() to execve() because too many poorly written programs
 diff --git a/fs/namei.c b/fs/namei.c
-index 1fa36df7b..ae8826bb3 100644
+index 1fa36df7b..7b393a277 100644
 --- a/fs/namei.c
 +++ b/fs/namei.c
 @@ -40,10 +40,18 @@
@@ -283,32 +283,23 @@ index 1fa36df7b..ae8826bb3 100644
  		dentry = lookup_slow(&nd->last, nd->path.dentry, nd->flags);
  		if (IS_ERR(dentry))
  			return ERR_CAST(dentry);
-@@ -2257,6 +2351,9 @@ static int link_path_walk(const char *name, struct nameidata *nd)
- 
- 	/* At this point we know we have a real path component. */
- 	for(;;) {
-+#ifdef CONFIG_KSU_SUSFS_SUS_PATH
-+		struct dentry *dentry;
-+#endif
- 		struct user_namespace *mnt_userns;
+@@ -2261,7 +2355,15 @@ static int link_path_walk(const char *name, struct nameidata *nd)
  		const char *link;
  		u64 hash_len;
-@@ -2267,6 +2364,14 @@ static int link_path_walk(const char *name, struct nameidata *nd)
- 		if (err)
- 			return err;
- 
+ 		int type;
 +#ifdef CONFIG_KSU_SUSFS_SUS_PATH
-+		dentry = nd->path.dentry;
++		struct dentry *dentry = nd->path.dentry;
+ 
 +		if (dentry->d_inode && susfs_is_inode_sus_path(dentry->d_inode)) {
 +			// - No need to dput() here
 +			// - return -ENOENT here since it is walking the sub path of sus path
 +			return -ENOENT;
 +		}
 +#endif
- 		hash_len = hash_name(nd->path.dentry, name);
- 
- 		type = LAST_NORM;
-@@ -2450,6 +2555,9 @@ static inline const char *lookup_last(struct nameidata *nd)
+ 		mnt_userns = mnt_user_ns(nd->path.mnt);
+ 		err = may_lookup(mnt_userns, nd);
+ 		if (err)
+@@ -2450,6 +2552,9 @@ static inline const char *lookup_last(struct nameidata *nd)
  {
  	if (nd->last_type == LAST_NORM && nd->last.name[nd->last.len])
  		nd->flags |= LOOKUP_FOLLOW | LOOKUP_DIRECTORY;
@@ -318,7 +309,7 @@ index 1fa36df7b..ae8826bb3 100644
  
  	return walk_component(nd, WALK_TRAILING);
  }
-@@ -3395,15 +3503,40 @@ static struct dentry *lookup_open(struct nameidata *nd, struct file *file,
+@@ -3395,15 +3500,40 @@ static struct dentry *lookup_open(struct nameidata *nd, struct file *file,
  	int error, create_error = 0;
  	umode_t mode = op->mode;
  	DECLARE_WAIT_QUEUE_HEAD_ONSTACK(wq);
@@ -359,7 +350,7 @@ index 1fa36df7b..ae8826bb3 100644
  			if (IS_ERR(dentry))
  				return dentry;
  		}
-@@ -3502,6 +3635,9 @@ static const char *open_last_lookups(struct nameidata *nd,
+@@ -3502,6 +3632,9 @@ static const char *open_last_lookups(struct nameidata *nd,
  	bool got_write = false;
  	struct dentry *dentry;
  	const char *res;
@@ -369,7 +360,7 @@ index 1fa36df7b..ae8826bb3 100644
  
  	nd->flags |= op->intent;
  
-@@ -3807,6 +3943,7 @@ struct file *do_filp_open(int dfd, struct filename *pathname,
+@@ -3807,6 +3940,7 @@ struct file *do_filp_open(int dfd, struct filename *pathname,
  
  	set_nameidata(&nd, dfd, pathname, NULL);
  	filp = path_openat(&nd, op, flags | LOOKUP_RCU);
@@ -377,7 +368,7 @@ index 1fa36df7b..ae8826bb3 100644
  	if (unlikely(filp == ERR_PTR(-ECHILD)))
  		filp = path_openat(&nd, op, flags);
  	if (unlikely(filp == ERR_PTR(-ESTALE)))
-@@ -5098,6 +5235,11 @@ int readlink_copy(char __user *buffer, int buflen, const char *link)
+@@ -5098,6 +5232,11 @@ int readlink_copy(char __user *buffer, int buflen, const char *link)
   *
   * Does not call security hook.
   */
@@ -389,7 +380,7 @@ index 1fa36df7b..ae8826bb3 100644
  int vfs_readlink(struct dentry *dentry, char __user *buffer, int buflen)
  {
  	struct inode *inode = d_inode(dentry);
-@@ -5107,7 +5249,18 @@ int vfs_readlink(struct dentry *dentry, char __user *buffer, int buflen)
+@@ -5107,7 +5246,18 @@ int vfs_readlink(struct dentry *dentry, char __user *buffer, int buflen)
  
  	if (unlikely(!(inode->i_opflags & IOP_DEFAULT_READLINK))) {
  		if (unlikely(inode->i_op->readlink))
@@ -400,15 +391,15 @@ index 1fa36df7b..ae8826bb3 100644
 +				if (!res)
 +					return res;
 +			}
-+			return inode->i_op->readlink(dentry, buffer, buflen);
+ 			return inode->i_op->readlink(dentry, buffer, buflen);
 +		}
 +#else
- 			return inode->i_op->readlink(dentry, buffer, buflen);
++			return inode->i_op->readlink(dentry, buffer, buflen);
 +#endif
  
  		if (!d_is_symlink(dentry))
  			return -EINVAL;
-@@ -5123,6 +5276,15 @@ int vfs_readlink(struct dentry *dentry, char __user *buffer, int buflen)
+@@ -5123,6 +5273,15 @@ int vfs_readlink(struct dentry *dentry, char __user *buffer, int buflen)
  		if (IS_ERR(link))
  			return PTR_ERR(link);
  	}
