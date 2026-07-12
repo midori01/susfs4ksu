@@ -1,5 +1,5 @@
 diff --git a/kernel/Kbuild b/kernel/Kbuild
-index fd31bb51..eb990887 100644
+index cc3610a8..eb990887 100644
 --- a/kernel/Kbuild
 +++ b/kernel/Kbuild
 @@ -4,24 +4,12 @@ kernelsu-objs += feature/kernel_umount.o
@@ -27,8 +27,18 @@ index fd31bb51..eb990887 100644
  
  ifneq ($(CONFIG_KSU_DISABLE_MANAGER),y)
  kernelsu-objs += manager/apk_sign.o
+@@ -61,9 +49,6 @@ endif
+ ifeq ($(CONFIG_KSU_DEBUG),y)
+ ccflags-y += -DCONFIG_KSU_DEBUG=1
+ endif
+-ifeq ($(CONFIG_KSU_X86_PATCH_SYSCALL_DISPATCHER),y)
+-ccflags-y += -DCONFIG_KSU_X86_PATCH_SYSCALL_DISPATCHER=1
+-endif
+ endif
+ 
+ ccflags-y += -I$(srctree)/security/selinux -I$(srctree)/security/selinux/include
 diff --git a/kernel/Kconfig b/kernel/Kconfig
-index c7701661..5c169f59 100644
+index 88e22811..5c169f59 100644
 --- a/kernel/Kconfig
 +++ b/kernel/Kconfig
 @@ -2,7 +2,6 @@ menu "KernelSU"
@@ -39,10 +49,14 @@ index c7701661..5c169f59 100644
  	default y
  	help
  	  Enable kernel-level root privileges on Android System.
-@@ -35,4 +34,95 @@ config KSU_DISABLE_POLICY
+@@ -35,12 +34,95 @@ config KSU_DISABLE_POLICY
  	  Escalation will always use the default full root profile, and
  	  non-root handling will follow the global umount policy only.
  
+-config KSU_X86_PATCH_SYSCALL_DISPATCHER
+-	bool "Dynamically patch x64's hardened syscall dispatcher to support syscall hooks"
+-	depends on KSU && X86_64
+-	default n
 +menu "KernelSU - SUSFS"
 +config KSU_SUSFS
 +	bool "KernelSU addon - SUSFS"
@@ -106,7 +120,9 @@ index c7701661..5c169f59 100644
 +	bool "Enable to spoof /proc/bootconfig (gki) or /proc/cmdline (non-gki)"
 +	depends on KSU_SUSFS
 +	default y
-+	help
+ 	help
+-	  Dynamically patch x64's hardened syscall dispatcher to support syscall hooks. This is a
+-	  replacement for a kernel source code patch, and is useful for x86_64 LKM mode.
 +	  - Spoof the output of /proc/bootconfig (gki) or /proc/cmdline (non-gki) with a user-defined file.
 +	  - Effective on all processes.
 +
@@ -133,7 +149,7 @@ index c7701661..5c169f59 100644
 +	  - Effective only on zygote spawned umounted user app process >= 10000.
 +
 +endmenu
-+
+ 
  endmenu
 diff --git a/kernel/Makefile b/kernel/Makefile
 index d40d0ec1..93f5388f 100644
@@ -155,7 +171,7 @@ index d40d0ec1..93f5388f 100644
 +
  # Keep a new line here!! Because someone may append config
 diff --git a/kernel/core/init.c b/kernel/core/init.c
-index e6e1b684..0af7fa35 100644
+index 09b290a9..0af7fa35 100644
 --- a/kernel/core/init.c
 +++ b/kernel/core/init.c
 @@ -6,6 +6,7 @@
@@ -186,7 +202,7 @@ index e6e1b684..0af7fa35 100644
 +#include "hook/setuid_hook.h"
 +#include "feature/sucompat.h"
  
--#if defined(__x86_64__)
+-#if defined(__x86_64__) && !defined(CONFIG_KSU_X86_PATCH_SYSCALL_DISPATCHER)
 -#include <asm/cpufeature.h>
 -#include <linux/version.h>
 -#ifndef X86_FEATURE_INDIRECT_SAFE
@@ -208,7 +224,7 @@ index e6e1b684..0af7fa35 100644
  
  int __init kernelsu_init(void)
  {
--#if defined(__x86_64__)
+-#if defined(__x86_64__) && !defined(CONFIG_KSU_X86_PATCH_SYSCALL_DISPATCHER)
 -    // If the kernel has the hardening patch, X86_FEATURE_INDIRECT_SAFE must be set
 -    if (!boot_cpu_has(X86_FEATURE_INDIRECT_SAFE)) {
 -        pr_alert("*************************************************************");
