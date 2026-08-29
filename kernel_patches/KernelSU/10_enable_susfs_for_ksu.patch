@@ -1,5 +1,5 @@
 diff --git a/kernel/Kbuild b/kernel/Kbuild
-index cc3610a8..eb990887 100644
+index 85932d39..f15b42e2 100644
 --- a/kernel/Kbuild
 +++ b/kernel/Kbuild
 @@ -4,24 +4,12 @@ kernelsu-objs += feature/kernel_umount.o
@@ -152,10 +152,10 @@ index 88e22811..5c169f59 100644
  
  endmenu
 diff --git a/kernel/Makefile b/kernel/Makefile
-index d40d0ec1..93f5388f 100644
+index f3485588..14a40b61 100644
 --- a/kernel/Makefile
 +++ b/kernel/Makefile
-@@ -24,4 +24,14 @@ format:
+@@ -33,4 +33,14 @@ format:
  check-format:
  	find . \( -name "*.c" -o -name "*.h" \) -print0 | xargs -0 clang-format --dry-run --Werror
  
