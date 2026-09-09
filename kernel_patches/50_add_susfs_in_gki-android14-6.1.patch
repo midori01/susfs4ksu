@@ -2302,6 +2302,53 @@ index 96d1c3edf..4eefd6dcb 100644
  	if (!error)
  		buf->f_flags = calculate_f_flags(path->mnt);
  	return error;
+diff --git a/fs/super.c b/fs/super.c
+index 904839eb7..f79812480 100644
+--- a/fs/super.c
++++ b/fs/super.c
+@@ -37,6 +37,9 @@
+ #include <linux/lockdep.h>
+ #include <linux/user_namespace.h>
+ #include <linux/fs_context.h>
++#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
++#include <linux/susfs_def.h>
++#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+ #include <uapi/linux/mount.h>
+ #include "internal.h"
+ 
+@@ -1081,6 +1084,11 @@ void emergency_thaw_all(void)
+ 
+ static DEFINE_IDA(unnamed_dev_ida);
+ 
++#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
++extern bool susfs_is_current_ksu_domain(void);
++extern struct static_key_true susfs_is_sdcard_android_data_not_decrypted;
++#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
++
+ /**
+  * get_anon_bdev - Allocate a block device for filesystems which don't have one.
+  * @p: Pointer to a dev_t.
+@@ -1100,8 +1108,20 @@ int get_anon_bdev(dev_t *p)
+ 	 * Many userspace utilities consider an FSID of 0 invalid.
+ 	 * Always return at least 1 from get_anon_bdev.
+ 	 */
++#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
++	if (static_branch_unlikely(&susfs_is_sdcard_android_data_not_decrypted)) {
++		if (susfs_is_current_ksu_domain()) {
++			dev = ida_alloc_range(&unnamed_dev_ida, DEFAULT_KSU_MNT_MINOR_DEV, (1 << MINORBITS) - 1,
++				GFP_ATOMIC);
++			goto bypass_orig_flow;
++		}
++	}
++#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+ 	dev = ida_alloc_range(&unnamed_dev_ida, 1, (1 << MINORBITS) - 1,
+ 			GFP_ATOMIC);
++#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
++bypass_orig_flow:
++#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+ 	if (dev == -ENOSPC)
+ 		dev = -EMFILE;
+ 	if (dev < 0)
 diff --git a/kernel/kallsyms.c b/kernel/kallsyms.c
 index 824bcc7b5..99c753390 100644
 --- a/kernel/kallsyms.c
