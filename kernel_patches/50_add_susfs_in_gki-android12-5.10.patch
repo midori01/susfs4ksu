@@ -2183,7 +2183,7 @@ index c6a2e1098..911b6ce2b 100644
  	if (path.mnt->mnt_root == path.dentry)
  		stat->attributes |= STATX_ATTR_MOUNT_ROOT;
 diff --git a/fs/statfs.c b/fs/statfs.c
-index d42b44dc0..d8d2c861e 100644
+index d42b44dc0..ca44ab114 100644
 --- a/fs/statfs.c
 +++ b/fs/statfs.c
 @@ -9,6 +9,10 @@
@@ -2213,10 +2213,10 @@ index d42b44dc0..d8d2c861e 100644
 +	retval = security_sb_statfs(dentry);
 +	if (retval)
 +		return retval;
-+	if (susfs_sus_kstat_spoof_vfs_statfs(d_backing_inode(dentry), buf, is_fuse))
-+		goto orig_flow;
++	if (!susfs_sus_kstat_spoof_vfs_statfs(d_backing_inode(dentry), buf, is_fuse))
++		goto bypass_orig_flow;
 +	retval = dentry->d_sb->s_op->statfs(dentry, buf);
-+orig_flow:
++bypass_orig_flow:
 +	if (retval == 0 && buf->f_frsize == 0)
 +		buf->f_frsize = buf->f_bsize;
 +	return retval;
