@@ -2303,10 +2303,10 @@ index 96d1c3edf..f4054d0a7 100644
  		buf->f_flags = calculate_f_flags(path->mnt);
  	return error;
 diff --git a/fs/super.c b/fs/super.c
-index 904839eb7..f79812480 100644
+index 904839eb7..909c51ac8 100644
 --- a/fs/super.c
 +++ b/fs/super.c
-@@ -37,6 +37,9 @@
+@@ -37,9 +37,17 @@
  #include <linux/lockdep.h>
  #include <linux/user_namespace.h>
  #include <linux/fs_context.h>
@@ -2316,39 +2316,37 @@ index 904839eb7..f79812480 100644
  #include <uapi/linux/mount.h>
  #include "internal.h"
  
-@@ -1081,6 +1084,11 @@ void emergency_thaw_all(void)
- 
- static DEFINE_IDA(unnamed_dev_ida);
- 
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +extern bool susfs_is_current_ksu_domain(void);
 +extern struct static_key_true susfs_is_sdcard_android_data_not_decrypted;
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +
- /**
-  * get_anon_bdev - Allocate a block device for filesystems which don't have one.
-  * @p: Pointer to a dev_t.
-@@ -1100,8 +1108,20 @@ int get_anon_bdev(dev_t *p)
- 	 * Many userspace utilities consider an FSID of 0 invalid.
- 	 * Always return at least 1 from get_anon_bdev.
- 	 */
+ static int thaw_super_locked(struct super_block *sb);
+ 
+ static LIST_HEAD(super_blocks);
+@@ -1096,6 +1104,22 @@ int get_anon_bdev(dev_t *p)
+ {
+ 	int dev;
+ 
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +	if (static_branch_unlikely(&susfs_is_sdcard_android_data_not_decrypted)) {
 +		if (susfs_is_current_ksu_domain()) {
 +			dev = ida_alloc_range(&unnamed_dev_ida, DEFAULT_KSU_MNT_MINOR_DEV, (1 << MINORBITS) - 1,
 +				GFP_ATOMIC);
-+			goto bypass_orig_flow;
++			if (dev == -ENOSPC)
++				dev = -EMFILE;
++			if (dev < 0)
++				return dev;
++
++			*p = MKDEV(0, dev);
++			return 0;
 +		}
 +	}
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
- 	dev = ida_alloc_range(&unnamed_dev_ida, 1, (1 << MINORBITS) - 1,
- 			GFP_ATOMIC);
-+#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-+bypass_orig_flow:
-+#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
- 	if (dev == -ENOSPC)
- 		dev = -EMFILE;
- 	if (dev < 0)
++
+ 	/*
+ 	 * Many userspace utilities consider an FSID of 0 invalid.
+ 	 * Always return at least 1 from get_anon_bdev.
 diff --git a/kernel/kallsyms.c b/kernel/kallsyms.c
 index 824bcc7b5..99c753390 100644
 --- a/kernel/kallsyms.c
