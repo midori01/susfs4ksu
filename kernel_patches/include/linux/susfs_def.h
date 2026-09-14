@@ -1,9 +1,10 @@
 #ifndef KSU_SUSFS_DEF_H
 #define KSU_SUSFS_DEF_H
 
-#include <linux/bits.h>
+#include <linux/bitops.h>
 #include <linux/bitmap.h>
 #include <linux/string.h>
+#include <linux/cred.h>
 
 /********/
 /* ENUM */
@@ -117,7 +118,7 @@ static inline bool susfs_ends_with(const char *str, const char *suffix) {
 }
 
 static inline bool susfs_is_current_app_uid(void) {
-	return ((current_uid().val % 100000) >= 10000);
+	return ((__kuid_val(current_uid()) % 100000) >= 10000);
 }
 
 static inline bool susfs_is_current_proc_umounted(void) {
@@ -146,7 +147,7 @@ static inline void susfs_clear_current_proc_umounted_for_zygote_next(void) {
 
 static inline bool susfs_is_current_proc_umounted_app(void) {
 	return (likely(test_thread_flag(TIF_PROC_UMOUNTED)) &&
-			current_uid().val >= 10000);
+			__kuid_val(current_uid()) >= 10000);
 }
 
 static inline bool susfs_is_current_proc_no_su(void) {
