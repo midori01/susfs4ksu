@@ -2,6 +2,7 @@
 #include <linux/cred.h>
 #include <linux/fs.h>
 #include <linux/slab.h>
+#include <linux/vmalloc.h>
 #include <linux/seq_file.h>
 #include <linux/printk.h>
 #include <linux/namei.h>
@@ -1673,7 +1674,9 @@ void susfs_set_priority_uid_filter(void __user **user_info) {
 		is_uid_filter_set_before = true;
 	mutex_unlock(&susfs_mutex_lock_priority_uid_filter);
 	synchronize_rcu();
-	kfree_rcu(old_bitmap, rcu);
+	/* kfree_rcu() does not accept NULL before kernel 5.3 */
+	if (old_bitmap)
+		kfree_rcu(old_bitmap, rcu);
 
 	SUSFS_LOGI("the priority uid filter is set\n");
 	err = 0;
@@ -1747,7 +1750,9 @@ static int susfs_priority_app_strings_worker(void *data) {
 	new_bitmap = NULL;
 	mutex_unlock(&susfs_mutex_lock_priority_uid_filter);
 	synchronize_rcu();
-	kfree_rcu(old_bitmap, rcu);
+	/* kfree_rcu() does not accept NULL before kernel 5.3 */
+	if (old_bitmap)
+		kfree_rcu(old_bitmap, rcu);
 
 	SUSFS_LOGI("the uids of the priority uid filter are resolved again\n");
 
@@ -2046,13 +2051,40 @@ static int watch_one_dir(struct watch_dir *wd)
  * synchronize_srcu on the same SRCU struct, causing a permanent deadlock).
  * Cleanup is deferred to a delayed_work that runs outside the SRCU context.
  */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0)
 static int susfs_handle_sdcard_inode_event(struct fsnotify_mark *mark, u32 mask,
 											struct inode *inode, struct inode *dir,
 											const struct qstr *file_name, u32 cookie)
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(5, 2, 0)
+static int susfs_handle_sdcard_inode_event(struct fsnotify_group *group,
+			    struct inode *inode,
+			    u32 mask, const void *data, int data_type,
+			    const struct qstr *file_name, u32 cookie,
+			    struct fsnotify_iter_info *iter_info)
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 18, 0)
+static int susfs_handle_sdcard_inode_event(struct fsnotify_group *group,
+			    struct inode *inode,
+			    u32 mask, const void *data, int data_type,
+			    const unsigned char *file_name, u32 cookie,
+			    struct fsnotify_iter_info *iter_info)
+#else
+static int susfs_handle_sdcard_inode_event(struct fsnotify_group *group,
+			    struct inode *inode,
+			    struct fsnotify_mark *inode_mark,
+			    struct fsnotify_mark *vfsmount_mark,
+			    u32 mask, const void *data, int data_type,
+			    const unsigned char *file_name, u32 cookie,
+			    struct fsnotify_iter_info *iter_info)
+#endif
 {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 2, 0)
 	if (!file_name || file_name->len != 7 ||
 	    memcmp(file_name->name, "Android", 7))
 		return 0;
+#else
+	if (!file_name || strcmp((const char *)file_name, "Android"))
+		return 0;
+#endif
 
 	if (test_and_set_bit(0, &sdcard_cleanup_scheduled))
 		return 0;
@@ -2064,7 +2096,11 @@ static int susfs_handle_sdcard_inode_event(struct fsnotify_mark *mark, u32 mask,
 }
 
 static const struct fsnotify_ops fsnotify_ops = {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0)
 	.handle_inode_event = susfs_handle_sdcard_inode_event,
+#else
+	.handle_event = susfs_handle_sdcard_inode_event,
+#endif
 };
 
 static int add_mark_on_inode(struct inode *inode, u32 mask,
@@ -2079,7 +2115,11 @@ static int add_mark_on_inode(struct inode *inode, u32 mask,
 	fsnotify_init_mark(m, g);
 	m->mask = mask;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 18, 0)
 	if (fsnotify_add_inode_mark(m, inode, 0)) {
+#else
+	if (fsnotify_add_mark(m, inode, NULL, 0)) {
+#endif
 		fsnotify_put_mark(m);
 		return -EINVAL;
 	}
