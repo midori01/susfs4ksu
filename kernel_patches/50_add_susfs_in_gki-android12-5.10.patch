@@ -2180,10 +2180,10 @@ index c6a2e1098..911b6ce2b 100644
  	if (path.mnt->mnt_root == path.dentry)
  		stat->attributes |= STATX_ATTR_MOUNT_ROOT;
 diff --git a/fs/statfs.c b/fs/statfs.c
-index d42b44dc0..d6cfd1938 100644
+index d42b44dc0..0d75dfb94 100644
 --- a/fs/statfs.c
 +++ b/fs/statfs.c
-@@ -9,6 +9,10 @@
+@@ -9,8 +9,20 @@
  #include <linux/security.h>
  #include <linux/uaccess.h>
  #include <linux/compat.h>
@@ -2193,8 +2193,18 @@ index d42b44dc0..d6cfd1938 100644
 +
  #include "internal.h"
  
++#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
++extern bool susfs_is_inode_sus_kstat(struct inode *inode, bool *out_is_fuse);
++extern int susfs_sus_kstat_spoof_vfs_statfs(struct inode *inode, struct kstatfs *buf, bool *is_fuse);
++#endif // #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
++#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
++extern struct vfsmount *susfs_get_non_sus_vfsmnt_from_vfsmnt(struct vfsmount *vfsmnt);
++#endif //#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
++
  static int flags_by_mnt(int mnt_flags)
-@@ -69,6 +73,28 @@ static int statfs_by_dentry(struct dentry *dentry, struct kstatfs *buf)
+ {
+ 	int flags = 0;
+@@ -69,6 +81,28 @@ static int statfs_by_dentry(struct dentry *dentry, struct kstatfs *buf)
  	return retval;
  }
  
@@ -2223,19 +2233,7 @@ index d42b44dc0..d6cfd1938 100644
  int vfs_get_fsid(struct dentry *dentry, __kernel_fsid_t *fsid)
  {
  	struct kstatfs st;
-@@ -83,10 +109,51 @@ int vfs_get_fsid(struct dentry *dentry, __kernel_fsid_t *fsid)
- }
- EXPORT_SYMBOL(vfs_get_fsid);
- 
-+#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
-+extern bool susfs_is_inode_sus_kstat(struct inode *inode, bool *out_is_fuse);
-+extern int susfs_sus_kstat_spoof_vfs_statfs(struct inode *inode, struct kstatfs *buf, bool *is_fuse);
-+#endif // #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
-+#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-+extern struct vfsmount *susfs_get_non_sus_vfsmnt_from_vfsmnt(struct vfsmount *vfsmnt);
-+#endif //#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-+
- int vfs_statfs(const struct path *path, struct kstatfs *buf)
+@@ -87,6 +121,39 @@ int vfs_statfs(const struct path *path, struct kstatfs *buf)
  {
  	int error;
  
