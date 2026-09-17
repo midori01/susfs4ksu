@@ -554,7 +554,7 @@ index bdc243fc4..665c974ad 100644
  	do_delayed_call(&done);
  	return res;
 diff --git a/fs/namespace.c b/fs/namespace.c
-index 6739e1c04..c0d02957e 100644
+index 6739e1c04..00179ba29 100644
 --- a/fs/namespace.c
 +++ b/fs/namespace.c
 @@ -33,11 +33,21 @@
@@ -801,11 +801,13 @@ index 6739e1c04..c0d02957e 100644
  	if (!mnt)
  		return ERR_PTR(-ENOMEM);
  
-@@ -1295,7 +1483,39 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
+@@ -1294,8 +1482,42 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
+ 	struct super_block *sb = old->mnt.mnt_sb;
  	struct mount *mnt;
  	int err;
- 
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
++	bool is_mnt_ksu_unshared = false;
++
 +	// - We will just stop checking for ksu process if /sdcard/Android is accessible,
 +	//   for the sake of performance
 +	if (static_branch_unlikely(&susfs_is_sdcard_android_data_not_decrypted)) {
@@ -818,6 +820,7 @@ index 6739e1c04..c0d02957e 100644
 +			//   mnt->mnt_id is assigned without ida when it is being freed in mnt_free_id().
 +			if (flag & CL_COPY_MNT_NS) {
 +				mnt = susfs_alloc_unshare_ksu_vfsmnt(old->mnt_devname, old->mnt_id);
++				is_mnt_ksu_unshared = true;
 +				goto bypass_orig_flow;
 +			}
 +			// else we just go assign fake mnt_id starting with DEFAULT_KSU_MNT_ID
@@ -833,7 +836,7 @@ index 6739e1c04..c0d02957e 100644
 +		goto bypass_orig_flow;
 +	}
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-+
+ 
  	mnt = alloc_vfsmnt(old->mnt_devname);
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +bypass_orig_flow:
@@ -841,15 +844,13 @@ index 6739e1c04..c0d02957e 100644
  	if (!mnt)
  		return ERR_PTR(-ENOMEM);
  
-@@ -1313,6 +1533,13 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
+@@ -1313,6 +1535,11 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
  	mnt->mnt.mnt_flags = old->mnt.mnt_flags;
  	mnt->mnt.mnt_flags &= ~(MNT_WRITE_HOLD|MNT_MARKED|MNT_INTERNAL);
  
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-+	if (static_branch_unlikely(&susfs_is_sdcard_android_data_not_decrypted)) {
-+		if (susfs_is_current_ksu_domain() && (flag & CL_COPY_MNT_NS))
-+			mnt->mnt.mnt_flags |= VFSMOUNT_MNT_FLAGS_KSU_UNSHARED_MNT;
-+	}
++	if (unlikely(is_mnt_ksu_unshared))
++		mnt->mnt.mnt_flags |= VFSMOUNT_MNT_FLAGS_KSU_UNSHARED_MNT;
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +
  	atomic_inc(&sb->s_active);
