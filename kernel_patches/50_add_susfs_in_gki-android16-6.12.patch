@@ -2117,7 +2117,7 @@ index adb071bc9..f30b435ad 100644
  		      AT_STATX_SYNC_TYPE))
  		return -EINVAL;
 diff --git a/fs/statfs.c b/fs/statfs.c
-index 83c5d3feb..b23311f83 100644
+index 83c5d3feb..aa6655c83 100644
 --- a/fs/statfs.c
 +++ b/fs/statfs.c
 @@ -9,8 +9,20 @@
@@ -2141,11 +2141,15 @@ index 83c5d3feb..b23311f83 100644
  static int flags_by_mnt(int mnt_flags)
  {
  	int flags = 0;
-@@ -69,6 +81,38 @@ static int statfs_by_dentry(struct dentry *dentry, struct kstatfs *buf)
+@@ -69,6 +81,42 @@ static int statfs_by_dentry(struct dentry *dentry, struct kstatfs *buf)
  	return retval;
  }
  
 +#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
++int statfs_by_dentry_wrapper(struct dentry *dentry, struct kstatfs *buf){
++	return statfs_by_dentry(dentry, buf);
++}
++
 +int calculate_f_flags_wrapper(struct vfsmount *mnt)
 +{
 +	return calculate_f_flags(mnt);
@@ -2180,7 +2184,7 @@ index 83c5d3feb..b23311f83 100644
  int vfs_get_fsid(struct dentry *dentry, __kernel_fsid_t *fsid)
  {
  	struct kstatfs st;
-@@ -87,6 +131,39 @@ int vfs_statfs(const struct path *path, struct kstatfs *buf)
+@@ -87,6 +135,39 @@ int vfs_statfs(const struct path *path, struct kstatfs *buf)
  {
  	int error;
  
