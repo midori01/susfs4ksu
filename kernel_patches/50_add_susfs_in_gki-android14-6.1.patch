@@ -2214,7 +2214,7 @@ index ef50573c7..60b31f5e4 100644
  
  	if (path.mnt->mnt_root == path.dentry)
 diff --git a/fs/statfs.c b/fs/statfs.c
-index 96d1c3edf..4cb840a69 100644
+index 96d1c3edf..a72a3b70e 100644
 --- a/fs/statfs.c
 +++ b/fs/statfs.c
 @@ -9,8 +9,20 @@
@@ -2243,7 +2243,7 @@ index 96d1c3edf..4cb840a69 100644
  }
  
 +#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
-+int susfs_calculate_f_flags(struct vfsmount *mnt)
++int calculate_f_flags_wrapper(struct vfsmount *mnt)
 +{
 +	return calculate_f_flags(mnt);
 +}
